@@ -1,0 +1,36 @@
+# Feed Type Overrides
+#
+# This file allows you to manually override the automatic feed type detection.
+# Use this when Ollama AI misclassifies a feed or you want to force a specific type.
+#
+# Format: feed_url = type
+#   - feed_url: The full RSS feed URL (must match exactly)
+#   - type: Either 'comic' or 'news'
+#
+# Examples:
+#   https://example.com/rss = comic
+#   https://another-site.com/feed.xml = news
+#
+# Notes:
+#   - Lines starting with # are comments and are ignored
+#   - Empty lines are ignored
+#   - Whitespace around URLs and types is automatically trimmed
+#   - URLs must match exactly (case-sensitive)
+#   - Invalid lines will be logged as warnings but won't stop processing
+#
+# Priority Order (highest to lowest):
+#   1. Manual overrides (this file) - HIGHEST PRIORITY
+#   2. Explicit FEED_TYPES config (hardcoded in src/config.py)
+#   3. Cache (.feed_type_cache.json)
+#   4. Ollama AI detection
+#   5. Default to 'comic' (fallback)
+#
+# To use this file:
+#   1. Copy this file to 'feed_type_overrides.txt' in the project root
+#   2. Add your overrides below (one per line)
+#   3. Save the file
+#   4. Run the RSS processor - your overrides will take effect immediately
+#
+# Example overrides (uncomment and modify as needed):
+# https://questionablecontent.net/QCRSS.xml = comic
+# https://macitynet.it/feed/ = news
