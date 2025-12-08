@@ -33,6 +33,7 @@ temp/
 
 # User-specific configuration
 feed_type_overrides.txt
+.config.json
 
 # IDE
 .vscode/

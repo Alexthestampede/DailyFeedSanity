@@ -50,6 +50,7 @@ TEXT_TITLE_TEMPERATURE = 0.2
 VISION_TEMPERATURE = 0.1
 FEED_TYPE_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent feed classification
 CLICKBAIT_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent clickbait detection
+LANGUAGE_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent language detection
 
 # Feed Classification
 # Comics are processed by downloading images

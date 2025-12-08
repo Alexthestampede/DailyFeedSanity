@@ -19,6 +19,7 @@ from .config import (
 )
 from .utils.logging_config import setup_logging, get_logger
 from .utils.file_manager import SafeFileManager
+from .utils.config_wizard import load_config, should_run_first_setup
 from .feed_processor.feed_manager import FeedManager
 from .comics.downloader import ComicDownloader
 from .news.summarizer import NewsSummarizer
@@ -155,6 +156,33 @@ def main():
     logger.info("="*60)
     logger.info("RSS Feed Processor Starting")
     logger.info("="*60)
+
+    # Check for first-time setup
+    if should_run_first_setup():
+        logger.info("First-time setup required")
+        print("\n" + "="*60)
+        print("FIRST-TIME SETUP")
+        print("="*60)
+        print("\nIt looks like this is your first time running the RSS Feed Processor.")
+        print("Would you like to run the interactive configuration wizard?")
+        print("\nThe wizard will help you:")
+        print("  - Select an AI provider (Ollama, LM Studio, OpenAI, Gemini, or Claude)")
+        print("  - Configure your models and connection settings")
+        print("  - Add RSS feeds to process")
+        print("\nYou can also skip this and configure manually in src/config.py")
+        print("\nRun the wizard now? [Y/n]: ", end="")
+
+        response = input().strip().lower()
+        if response in ['', 'y', 'yes']:
+            print("\nLaunching configuration wizard...")
+            print("Run: python -m src.utils.config_wizard\n")
+            logger.info("User chose to run configuration wizard")
+            sys.exit(0)
+        else:
+            print("\nSkipping wizard. You can run it later with:")
+            print("  python -m src.utils.config_wizard")
+            print("\nContinuing with default configuration...\n")
+            logger.info("User skipped first-time setup wizard")
 
     try:
         # Override AI provider if specified via CLI

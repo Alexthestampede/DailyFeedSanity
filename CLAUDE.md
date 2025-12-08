@@ -10,6 +10,23 @@ RSS feed processor that downloads webcomics and summarizes news articles using A
 
 ## Usage
 
+### First-Time Setup (Recommended)
+
+Run the interactive configuration wizard to set up your AI provider and RSS feeds:
+
+```bash
+python -m src.utils.config_wizard
+```
+
+This wizard will guide you through:
+- Selecting an AI provider (Ollama, LM Studio, OpenAI, Gemini, or Claude)
+- Configuring models and connection settings
+- Adding RSS feeds
+
+**See [CONFIG_WIZARD.md](CONFIG_WIZARD.md) for detailed wizard documentation.**
+
+### Running the Processor
+
 ```bash
 # Basic run (uses Ollama by default)
 python -m src.main
@@ -33,6 +50,9 @@ python scripts/test_ollama_summarizer.py --ai-provider lm_studio https://example
 # Test automatic feed type detection
 python scripts/test_feed_type_detection.py                     # Test known feeds
 python scripts/test_feed_type_detection.py https://feed.url    # Test specific feed
+
+# Test configuration wizard functions
+python scripts/test_config_wizard.py
 ```
 
 Output: `output/YYYY-MM-DD/index.html`
