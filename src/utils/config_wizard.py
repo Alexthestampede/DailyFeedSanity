@@ -603,7 +603,23 @@ def add_rss_feed(config: Dict) -> bool:
 
     # Also append to rss.txt file
     try:
+        # Ensure the file ends with a newline before appending
+        if RSS_FILE.exists():
+            with open(RSS_FILE, 'rb') as f:
+                f.seek(0, 2)  # Go to end of file
+                if f.tell() > 0:  # File is not empty
+                    f.seek(-1, 2)  # Go to last byte
+                    last_char = f.read(1)
+                    needs_newline = last_char != b'\n'
+                else:
+                    needs_newline = False
+        else:
+            needs_newline = False
+
+        # Append the feed URL
         with open(RSS_FILE, 'a') as f:
+            if needs_newline:
+                f.write('\n')
             f.write(f"{feed_url}\n")
         print(f"Feed added successfully!")
         return True
