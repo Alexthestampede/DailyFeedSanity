@@ -107,6 +107,21 @@ def save_config(config: Dict) -> bool:
         return False
 
 
+def should_run_first_setup() -> bool:
+    """
+    Determine if first-time setup should be run.
+
+    Returns:
+        True if configuration doesn't exist or first_run_complete is False, False otherwise
+    """
+    config = load_config()
+    if config is None:
+        return True
+
+    # Check if first run was completed
+    return not config.get('first_run_complete', False)
+
+
 def clear_screen():
     """Clear the terminal screen."""
     os.system('clear' if os.name != 'nt' else 'cls')

@@ -19,4 +19,4 @@ https://www.techspot.com/backend.xml
 https://feeds.macrumors.com/MacRumors-All
 https://www.ansa.it/canale_scienza_tecnica/notizie/scienzaetecnica_rss.xml
 https://clouddosage.com/category/news/boosteroid/feed/
-https://steamdeckhq.com/feed/
+https://steamdeckhq.com/feed/https://9to5mac.com/guides/mac/feed/
