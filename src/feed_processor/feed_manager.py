@@ -208,7 +208,8 @@ class FeedManager:
                 'feed_type': feed_type,
                 'special_handler': special_handler,
                 'entries': entries_to_process,
-                'session': session  # Pass session for subsequent requests
+                'session': session,  # Pass session for subsequent requests
+                'feed_data': feed_data  # Pass original parsed feed data for language detection
             }
 
             logger.info(f"Successfully processed {feed_url} as {feed_type} ({len(entries_to_process)} entries)")

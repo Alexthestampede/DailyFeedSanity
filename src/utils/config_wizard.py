@@ -20,6 +20,8 @@ except ImportError:
 # Configuration file path
 CONFIG_FILE = Path(__file__).parent.parent.parent / '.config.json'
 RSS_FILE = Path(__file__).parent.parent.parent / 'rss.txt'
+LANGUAGE_OVERRIDE_FILE = Path(__file__).parent.parent.parent / 'feed_language_overrides.txt'
+LANGUAGE_CACHE_FILE = Path(__file__).parent.parent.parent / '.feed_language_cache.json'
 
 
 # AI Provider Information
@@ -710,6 +712,254 @@ def view_all_feeds(config: Dict):
     print()
 
 
+def view_language_overrides():
+    """Display all configured language overrides."""
+    print_section("Language Overrides")
+
+    if not LANGUAGE_OVERRIDE_FILE.exists():
+        print("No language overrides configured.")
+        print("\nYou can add overrides to force specific languages for feeds.")
+        print("Example: macitynet.it = Italian")
+        return
+
+    try:
+        with open(LANGUAGE_OVERRIDE_FILE, 'r') as f:
+            lines = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
+
+        if not lines:
+            print("No language overrides configured.")
+            return
+
+        print("Language Overrides")
+        print("=" * 50)
+        print()
+
+        # Parse and display overrides
+        overrides = []
+        for line in lines:
+            if '=' in line:
+                domain, language = line.split('=', 1)
+                domain = domain.strip()
+                language = language.strip()
+                overrides.append((domain, language))
+
+        if not overrides:
+            print("No valid overrides found.")
+            return
+
+        # Find longest domain for formatting
+        max_domain_len = max(len(d) for d, _ in overrides)
+
+        for domain, language in overrides:
+            print(f"{domain:<{max_domain_len + 5}} → {language}")
+
+        print()
+        print(f"Total: {len(overrides)} override(s)")
+        print()
+
+    except IOError as e:
+        print(f"Error reading language overrides: {e}")
+
+
+def add_language_override() -> bool:
+    """
+    Add a language override for a feed.
+
+    Returns:
+        True if override was added, False otherwise
+    """
+    print_section("Add Language Override")
+
+    print("Enter the domain or URL for the feed.")
+    print("Examples: macitynet.it, feedburner.com/psblog, https://9to5mac.com/feed")
+    print()
+
+    domain = get_input("Enter domain or URL")
+
+    if not domain:
+        print("No domain provided.")
+        return False
+
+    # Clean up the domain (extract domain from URL if needed)
+    from urllib.parse import urlparse
+    try:
+        parsed = urlparse(domain if '://' in domain else f'https://{domain}')
+        # Keep the full path for feeds like feedburner.com/psblog
+        if parsed.path and parsed.path != '/':
+            domain_key = f"{parsed.netloc}{parsed.path}".rstrip('/')
+        else:
+            domain_key = parsed.netloc
+    except Exception:
+        domain_key = domain
+
+    print()
+    print("Common languages: English, Italian, Spanish, French, German, Chinese, Japanese")
+    print("You can enter any language name.")
+    print()
+
+    language = get_input("Enter language")
+
+    if not language:
+        print("No language provided.")
+        return False
+
+    # Capitalize first letter for consistency
+    language = language.strip().capitalize()
+
+    # Check if override already exists and handle replacement
+    try:
+        existing_overrides = {}
+        other_lines = []
+
+        if LANGUAGE_OVERRIDE_FILE.exists():
+            with open(LANGUAGE_OVERRIDE_FILE, 'r') as f:
+                for line in f:
+                    stripped = line.strip()
+                    if stripped and not stripped.startswith('#') and '=' in stripped:
+                        d, l = stripped.split('=', 1)
+                        d = d.strip()
+                        existing_overrides[d] = l.strip()
+                    else:
+                        # Preserve comments and blank lines
+                        other_lines.append(line)
+
+        if domain_key in existing_overrides:
+            print(f"\nOverride already exists: {domain_key} → {existing_overrides[domain_key]}")
+            if not get_yes_no("Replace with new language?", default=False):
+                return False
+            # Update the override
+            existing_overrides[domain_key] = language
+        else:
+            # Add new override
+            existing_overrides[domain_key] = language
+
+        # Write all overrides back
+        with open(LANGUAGE_OVERRIDE_FILE, 'w') as f:
+            # Write comments and blank lines first
+            for line in other_lines:
+                f.write(line)
+
+            # Write all overrides
+            for domain, lang in existing_overrides.items():
+                f.write(f"{domain} = {lang}\n")
+
+        print(f"\nLanguage override added: {domain_key} → {language}")
+        return True
+
+    except IOError as e:
+        print(f"Error writing language override: {e}")
+        return False
+
+
+def remove_language_override() -> bool:
+    """
+    Remove a language override.
+
+    Returns:
+        True if override was removed, False otherwise
+    """
+    print_section("Remove Language Override")
+
+    if not LANGUAGE_OVERRIDE_FILE.exists():
+        print("No language overrides configured.")
+        return False
+
+    try:
+        # Read all overrides
+        with open(LANGUAGE_OVERRIDE_FILE, 'r') as f:
+            lines = f.readlines()
+
+        # Parse valid overrides
+        overrides = []
+        other_lines = []
+        for line in lines:
+            stripped = line.strip()
+            if stripped and not stripped.startswith('#') and '=' in stripped:
+                domain, language = stripped.split('=', 1)
+                overrides.append((domain.strip(), language.strip()))
+            else:
+                # Preserve comments and blank lines
+                other_lines.append(line)
+
+        if not overrides:
+            print("No language overrides configured.")
+            return False
+
+        # Display overrides
+        print("Current language overrides:\n")
+        for i, (domain, language) in enumerate(overrides, 1):
+            print(f"  [{i}] {domain} → {language}")
+        print()
+
+        # Get selection
+        response = input(f"Select override to remove [1-{len(overrides)}, or 'c' to cancel]: ").strip()
+
+        if response.lower() == 'c':
+            return False
+
+        try:
+            index = int(response) - 1
+            if 0 <= index < len(overrides):
+                removed_domain, removed_language = overrides[index]
+
+                # Remove the selected override
+                overrides.pop(index)
+
+                # Write back (comments first, then overrides)
+                with open(LANGUAGE_OVERRIDE_FILE, 'w') as f:
+                    # Write comments and blank lines
+                    for line in other_lines:
+                        f.write(line)
+
+                    # Write remaining overrides
+                    for domain, language in overrides:
+                        f.write(f"{domain} = {language}\n")
+
+                print(f"\nLanguage override removed: {removed_domain} → {removed_language}")
+                return True
+            else:
+                print(f"Please enter a number between 1 and {len(overrides)}")
+                return False
+
+        except ValueError:
+            print("Invalid input.")
+            return False
+
+    except IOError as e:
+        print(f"Error updating language overrides: {e}")
+        return False
+
+
+def clear_language_cache() -> bool:
+    """
+    Clear the language detection cache.
+
+    Returns:
+        True if cache was cleared, False otherwise
+    """
+    print_section("Clear Language Cache")
+
+    if not LANGUAGE_CACHE_FILE.exists():
+        print("Language cache does not exist.")
+        return False
+
+    print("This will force all feed languages to be re-detected on the next run.")
+    print()
+
+    if not get_yes_no("Are you sure?", default=False):
+        return False
+
+    try:
+        LANGUAGE_CACHE_FILE.unlink()
+        print("\nLanguage cache cleared successfully.")
+        print("Languages will be re-detected on next run.")
+        return True
+
+    except IOError as e:
+        print(f"Error clearing language cache: {e}")
+        return False
+
+
 def test_ai_connection(config: Dict):
     """Test connection to configured AI provider."""
     print_section("Test AI Connection")
@@ -798,10 +1048,14 @@ def interactive_menu(config: Dict):
         print("  [6] View all feeds")
         print("  [7] Test AI connection")
         print("  [8] Reset configuration")
-        print("  [9] Exit")
+        print("  [9] View language overrides")
+        print(" [10] Add language override")
+        print(" [11] Remove language override")
+        print(" [12] Clear language cache")
+        print(" [13] Exit")
         print()
 
-        choice = input("Select option [1-9]: ").strip()
+        choice = input("Select option [1-13]: ").strip()
 
         if choice == '1':
             # Change AI provider (requires full reconfiguration)
@@ -914,12 +1168,32 @@ def interactive_menu(config: Dict):
                 break
 
         elif choice == '9':
+            # View language overrides
+            view_language_overrides()
+            input("Press Enter to continue...")
+
+        elif choice == '10':
+            # Add language override
+            add_language_override()
+            input("Press Enter to continue...")
+
+        elif choice == '11':
+            # Remove language override
+            remove_language_override()
+            input("Press Enter to continue...")
+
+        elif choice == '12':
+            # Clear language cache
+            clear_language_cache()
+            input("Press Enter to continue...")
+
+        elif choice == '13':
             # Exit
             print("\nExiting configuration wizard.")
             break
 
         else:
-            print("\nInvalid option. Please select 1-9.")
+            print("\nInvalid option. Please select 1-13.")
             input("Press Enter to continue...")
 
 

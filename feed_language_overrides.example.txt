@@ -1,0 +1,30 @@
+# Feed Language Override Configuration
+#
+# This file allows you to manually specify the language for any feed domain.
+# Manual overrides take HIGHEST priority (above cache and AI detection).
+#
+# Format: domain_or_url = language
+#
+# You can use either:
+#   - Just the domain: macitynet.it = Italian
+#   - Full URL: https://www.macitynet.it/feed/ = Italian
+#
+# Language names should be in English (e.g., "English", "Italian", "Spanish", "Chinese")
+#
+# Examples:
+# macitynet.it = Italian
+# feedburner.com/psblog = Italian
+# 9to5mac.com = English
+# lemonde.fr = French
+# elpais.com = Spanish
+# spiegel.de = German
+# asahi.com = Japanese
+# chinadaily.com.cn = Chinese
+#
+# To use this file:
+# 1. Copy this file to feed_language_overrides.txt
+# 2. Add your overrides below
+# 3. Run the RSS processor - overrides take effect immediately
+#
+# Lines starting with # are comments and will be ignored.
+# Blank lines are also ignored.

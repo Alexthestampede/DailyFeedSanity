@@ -30,9 +30,11 @@ temp/
 
 # Cache files
 .feed_type_cache.json
+.feed_language_cache.json
 
 # User-specific configuration
 feed_type_overrides.txt
+feed_language_overrides.txt
 .config.json
 
 # IDE

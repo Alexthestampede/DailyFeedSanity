@@ -50,7 +50,8 @@ TEXT_TITLE_TEMPERATURE = 0.2
 VISION_TEMPERATURE = 0.1
 FEED_TYPE_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent feed classification
 CLICKBAIT_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent clickbait detection
-LANGUAGE_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent language detection
+LANGUAGE_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent language detection (per-article, deprecated)
+FEED_LANGUAGE_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent feed language detection
 
 # Feed Classification
 # Comics are processed by downloading images
@@ -117,6 +118,8 @@ RSS_FILE = os.path.join(BASE_DIR, 'rss.txt')
 LOG_DIR = os.path.join(BASE_DIR, 'logs')
 FEED_TYPE_CACHE_FILE = os.path.join(BASE_DIR, '.feed_type_cache.json')  # Cache for Ollama feed classification
 FEED_TYPE_OVERRIDES_FILE = os.path.join(BASE_DIR, 'feed_type_overrides.txt')  # Manual feed type overrides
+FEED_LANGUAGE_CACHE_FILE = os.path.join(BASE_DIR, '.feed_language_cache.json')  # Cache for feed language detection
+FEED_LANGUAGE_OVERRIDE_FILE = os.path.join(BASE_DIR, 'feed_language_overrides.txt')  # Manual feed language overrides
 
 # Logging
 LOG_LEVEL = 'INFO'

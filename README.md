@@ -16,7 +16,8 @@ An intelligent RSS feed processor that downloads webcomics and summarizes news a
 - **Text Processing**: Summarization, title generation, language detection
 - **Vision Processing**: Image validation, comic verification, multi-page detection
 - **Clickbait Detection**: AI + author-based detection with special handling
-- **Multi-language**: Automatic language detection and matching
+- **Feed-Level Language Detection**: Detects language once per feed (not per article), massive token savings
+- **Language Override System**: Force any feed to summarize in any language (e.g., Italian→English)
 
 ### User Experience
 - **Single HTML Output**: Collapsible summaries, dark mode support
@@ -102,6 +103,9 @@ python -m src.main --debug
 
 # Validate images with AI
 python -m src.main --validate-images
+
+# Manage configuration (AI provider, feeds, language overrides)
+python -m src.utils.config_wizard
 ```
 
 For more examples and details, run: `python -m src.main --help`
@@ -132,7 +136,9 @@ See [AI_PROVIDERS.md](AI_PROVIDERS.md) for detailed comparison and setup instruc
 ## Documentation
 
 - **[QUICKSTART.md](QUICKSTART.md)** - 5-minute setup guide
+- **[CONFIG_WIZARD.md](CONFIG_WIZARD.md)** - Interactive configuration management
 - **[AI_PROVIDERS.md](AI_PROVIDERS.md)** - Detailed provider comparison and setup
+- **[LANGUAGE_DETECTION.md](LANGUAGE_DETECTION.md)** - Language detection and override system
 - **[CLAUDE.md](CLAUDE.md)** - Developer reference and architecture
 - **Help**: `python -m src.main --help`
 

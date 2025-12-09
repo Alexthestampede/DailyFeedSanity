@@ -109,6 +109,42 @@ The system supports **five AI providers** for text summarization, title generati
   5. Default to 'comic' (fallback)
 - Falls back gracefully if AI provider is unavailable
 
+**Language Detection**:
+- **Feed-level detection**: Language detected ONCE per feed domain, not per article (massive token savings)
+- **Solves multi-language issues**: Prevents "Chinese leaker posts → Chinese summary" problem
+- **Automatic caching**: Results stored in `.feed_language_cache.json` and persist across runs
+- **Manual overrides**: Override any feed's language in `feed_language_overrides.txt`
+- **Priority order** (highest to lowest):
+  1. **Manual overrides** (`feed_language_overrides.txt`) - User always right!
+  2. Hardcoded config (`LANGUAGE_OVERRIDES` in `config.py`)
+  3. Cache (`.feed_language_cache.json`)
+  4. AI provider detection (automatic)
+  5. Default to None (no language override, AI decides per article)
+- **Efficiency**: Only detects once per feed, cached permanently until cleared
+- **Configuration wizard**: Manage language overrides interactively (options 9-12)
+
+**Override File Format**:
+```
+# Feed Language Overrides
+macitynet.it = Italian
+feedburner.com/psblog = Italian
+9to5mac.com = English
+```
+
+**Use Cases**:
+- Force Italian tech news to summarize in English
+- Fix multi-language feeds (e.g., Chinese leaker posting to English site)
+- Ensure consistent language for region-specific content
+- Override AI detection when incorrect
+
+**Managing Overrides**:
+- **Add**: Use config wizard option [10] or edit `feed_language_overrides.txt` manually
+- **View**: Config wizard option [9] shows all current overrides
+- **Remove**: Config wizard option [11] for interactive removal
+- **Clear cache**: Config wizard option [12] forces fresh detection on next run
+
+**See [LANGUAGE_DETECTION.md](LANGUAGE_DETECTION.md) for detailed guide.**
+
 **Clickbait Handling**: Articles by "Francesca Testa" get special prompting for objective summarization.
 
 ### HTML Output
@@ -316,6 +352,27 @@ LM_STUDIO_BASE_URL = "http://192.168.2.150:1234"
   ```
 - Or clear cache and re-detect: `rm .feed_type_cache.json`
 - Manual overrides always win (highest priority)
+
+### Wrong Language Detected
+- Check logs to see detected language: "Language for domain.com: Italian"
+- Override in `feed_language_overrides.txt`:
+  ```
+  domain.com = English
+  ```
+- Or use config wizard option [10] to add override interactively
+- Clear cache to force re-detection: `python -m src.utils.config_wizard` → [12]
+- Manual overrides always win (highest priority)
+- **Common case**: Italian tech sites summarized in Italian instead of English
+
+### Articles Summarized in Wrong Language
+- This is a **feed-level** setting, not per-article
+- Check feed's detected/overridden language in logs
+- Add language override for the feed's domain:
+  ```
+  # Force all macitynet.it articles to English
+  macitynet.it = English
+  ```
+- Language detection is cached per feed domain, so fixing one feed fixes ALL articles from that feed
 
 ### AI Provider Errors
 

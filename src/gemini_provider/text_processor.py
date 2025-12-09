@@ -40,58 +40,6 @@ class GeminiTextClient(BaseTextProcessor):
         self.client = GeminiClient(api_key=api_key)
         self.model = model
 
-    def detect_language(self, text: str) -> str:
-        """
-        Detect the language of the given text.
-
-        Args:
-            text: Text to analyze (first 2000 chars used for efficiency)
-
-        Returns:
-            Language name (e.g., "English", "Italian", "Spanish") or "English" on error
-        """
-        if not text or not text.strip():
-            logger.warning("Empty text provided for language detection")
-            return "English"
-
-        # Use first 2000 chars for efficiency
-        excerpt = text[:2000]
-
-        system_prompt = (
-            "You are a language detection expert. "
-            "Respond with ONLY the language name, nothing else. "
-            "Examples: English, Italian, Spanish, French, German, Portuguese, Japanese, Chinese, etc."
-        )
-
-        user_prompt = f"What language is this text written in? Respond with only the language name:\n\n{excerpt}"
-
-        try:
-            response = self.client.generate(
-                prompt=user_prompt,
-                system=system_prompt,
-                temperature=LANGUAGE_DETECTION_TEMPERATURE,
-                model=self.model
-            )
-
-            if not response:
-                logger.warning("Empty response from language detection, defaulting to English")
-                return "English"
-
-            # Clean up response - should be just the language name
-            detected_language = response.strip().strip('"\'.,')
-
-            # Validate it's a reasonable response (not too long)
-            if len(detected_language) > 50:
-                logger.warning(f"Unexpected language detection response: {detected_language[:50]}...")
-                return "English"
-
-            logger.debug(f"Detected language: {detected_language}")
-            return detected_language
-
-        except Exception as e:
-            logger.error(f"Error in language detection: {e}")
-            return "English"
-
     def detect_clickbait(self, title: str, text: str) -> bool:
         """
         Use AI to detect if an article is clickbait.
@@ -144,7 +92,7 @@ Respond with ONLY "yes" or "no" - nothing else."""
             return False
 
     def generate_summary(self, text: str, title: str = None, author: str = None,
-                        max_length: int = MAX_SUMMARY_LENGTH) -> Optional[Dict[str, Any]]:
+                        language: str = "English", max_length: int = MAX_SUMMARY_LENGTH) -> Optional[Dict[str, Any]]:
         """
         Generate a summary of the article text.
 
@@ -152,6 +100,7 @@ Respond with ONLY "yes" or "no" - nothing else."""
             text: Article text to summarize
             title: Article title (for clickbait detection)
             author: Article author (for hardcoded clickbait check)
+            language: Language to use for the summary (e.g., "English", "Italian")
             max_length: Maximum summary length
 
         Returns:
@@ -179,17 +128,16 @@ Respond with ONLY "yes" or "no" - nothing else."""
         else:
             clickbait_detected_by = None
 
-        # Step 1: Detect the language of the article
-        detected_language = self.detect_language(text)
-        logger.info(f"Detected article language: {detected_language}")
+        # Use provided language for summary
+        logger.info(f"Generating summary in {language}")
 
-        # Step 2: Use appropriate prompt based on detection with explicit language requirement
+        # Use appropriate prompt based on detection with explicit language requirement
         if is_clickbait:
             system_prompt = self._get_clickbait_prompt()
-            user_prompt = f"IMPORTANT: You MUST respond in {detected_language}. Summarize the following article:\n\n{text[:10000]}"
+            user_prompt = f"IMPORTANT: You MUST respond in {language}. Summarize the following article:\n\n{text[:10000]}"
         else:
             system_prompt = self._get_standard_prompt()
-            user_prompt = f"IMPORTANT: You MUST respond in {detected_language}. Summarize the following article:\n\n{text[:10000]}"
+            user_prompt = f"IMPORTANT: You MUST respond in {language}. Summarize the following article:\n\n{text[:10000]}"
 
         try:
             summary = self.client.generate(
@@ -208,7 +156,7 @@ Respond with ONLY "yes" or "no" - nothing else."""
                 summary = summary[:max_length].rsplit('.', 1)[0] + '.'
 
             # Generate title from summary
-            generated_title = self.generate_title(summary)
+            generated_title = self.generate_title(summary, language=language)
 
             return {
                 'summary': summary,
@@ -221,27 +169,26 @@ Respond with ONLY "yes" or "no" - nothing else."""
             logger.error(f"Error generating summary: {e}")
             return None
 
-    def generate_title(self, summary: str) -> str:
+    def generate_title(self, summary: str, language: str = "English") -> str:
         """
         Generate a concise title from the summary.
 
         Args:
             summary: Article summary
+            language: Language to use for the title (e.g., "English", "Italian")
 
         Returns:
             Generated title (max 80 chars)
         """
-        # Step 1: Detect the language of the summary
-        detected_language = self.detect_language(summary)
-        logger.debug(f"Detected summary language for title generation: {detected_language}")
+        logger.debug(f"Generating title in {language}")
 
         system_prompt = (
             "You are a headline writer. Generate concise, informative titles "
             "that are NOT clickbait. Be straightforward and factual."
         )
 
-        # Step 2: Generate title with explicit language requirement
-        user_prompt = f"IMPORTANT: You MUST respond in {detected_language}. Generate a headline for this summary:\n\n{summary}"
+        # Generate title with explicit language requirement
+        user_prompt = f"IMPORTANT: You MUST respond in {language}. Generate a headline for this summary:\n\n{summary}"
 
         try:
             title = self.client.generate(
