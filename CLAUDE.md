@@ -28,6 +28,9 @@ This wizard will guide you through:
 ### Running the Processor
 
 ```bash
+# Quick launch (one-click script)
+./dailyfeedsanity.sh
+
 # Basic run (uses Ollama by default)
 python -m src.main
 
