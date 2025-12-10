@@ -27,36 +27,49 @@ An intelligent RSS feed processor that downloads webcomics and summarizes news a
 
 ## Quick Start
 
-### 1. Basic Setup (Using Ollama)
+### 1. One-Click Setup (Recommended)
+
+```bash
+# Run setup script (creates virtual environment, installs dependencies)
+./setup.sh
+
+# Launch the processor
+./dailyfeedsanity.sh
+```
+
+**Output**: `output/YYYY-MM-DD/index.html`
+
+### 2. Basic Setup (Using Ollama)
 
 ```bash
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Pull a model
-
 ollama pull granite4:tiny-h
 
-# Run the processor
-python -m src.main
+# Run setup and processor
+./setup.sh
+./dailyfeedsanity.sh
 ```
 
-**Output**: `output/YYYY-MM-DD/index.html`
-
-### 2. Using Cloud AI (Gemini - Free Tier)
+### 3. Using Cloud AI (Gemini - Free Tier)
 
 ```bash
 # Get API key from https://aistudio.google.com/app/apikey
 export GEMINI_API_KEY='your-key-here'
 
-# Run with Gemini
-python -m src.main --ai-provider gemini
+# Run setup and configure
+./setup.sh
+./dailyfeedsanity.sh --config  # Select Gemini in wizard
+./dailyfeedsanity.sh
 ```
 
-### 3. View Help
+### 4. View Help
 
 ```bash
-python -m src.main --help
+./dailyfeedsanity.sh --help
+# OR: source .venv/bin/activate && python -m src.main --help
 ```
 
 ## Installation
@@ -70,24 +83,68 @@ python -m src.main --help
 
 ### Setup
 
+**Method 1: Automated Setup (Recommended for macOS/Linux)**
 ```bash
 # Clone repository
 cd /path/to/DailyFeedSanity
 
+# Run setup script (creates venv, installs deps, runs config wizard)
+./setup.sh
+
+# Done! Now run the processor
+./dailyfeedsanity.sh
+```
+
+**Method 2: Manual Setup**
+```bash
+# Create virtual environment
+python3 -m venv .venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
 # Install dependencies
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 
 # (Optional) Set up API keys
 export GEMINI_API_KEY='your-key'
 export OPENAI_API_KEY='your-key'
 export ANTHROPIC_API_KEY='your-key'
+
+# Run configuration wizard
+python -m src.utils.config_wizard
+
+# Run the processor
+python -m src.main
 ```
+
+**macOS Note**: The setup script uses a virtual environment to avoid conflicts with system Python (required on macOS with Homebrew Python).
 
 ## Usage
 
 ### Basic Commands
 
+**Using the launcher script** (recommended after running setup.sh):
 ```bash
+# Default run (uses configured AI provider)
+./dailyfeedsanity.sh
+
+# Run configuration wizard
+./dailyfeedsanity.sh --config
+
+# Pass arguments to the processor
+./dailyfeedsanity.sh --debug
+./dailyfeedsanity.sh --all-entries
+./dailyfeedsanity.sh --validate-images
+./dailyfeedsanity.sh --ai-provider gemini
+
+# View help
+./dailyfeedsanity.sh --help
+```
+
+**Using Python directly** (requires activating venv first):
+```bash
+# Activate virtual environment
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+
 # Default (Ollama, 24-hour news filter)
 python -m src.main
 
@@ -109,7 +166,7 @@ python -m src.main --validate-images
 python -m src.utils.config_wizard
 ```
 
-For more examples and details, run: `python -m src.main --help`
+For more examples and details, run: `./dailyfeedsanity.sh --help`
 
 ## AI Provider Comparison
 

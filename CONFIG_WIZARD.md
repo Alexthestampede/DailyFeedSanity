@@ -9,7 +9,8 @@ The Configuration Wizard is an interactive tool for setting up and managing your
 When you run the wizard for the first time, it will guide you through:
 
 ```bash
-python -m src.utils.config_wizard
+./dailyfeedsanity.sh --config
+# OR: source .venv/bin/activate && python -m src.utils.config_wizard
 ```
 
 The wizard will help you:

@@ -80,7 +80,32 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}[3/5] Installing/Updating Python dependencies...${NC}"
+echo -e "${BLUE}[3/5] Setting up virtual environment...${NC}"
+
+# Create virtual environment if it doesn't exist
+if [ ! -d ".venv" ]; then
+    echo -e "${YELLOW}  Creating virtual environment...${NC}"
+    if $PYTHON_CMD -m venv .venv; then
+        echo -e "${GREEN}✓ Virtual environment created${NC}"
+    else
+        echo -e "${RED}✗ Failed to create virtual environment${NC}"
+        echo -e "${YELLOW}  Try installing python3-venv: sudo apt install python3-venv (Linux)${NC}"
+        exit 1
+    fi
+else
+    echo -e "${GREEN}✓ Virtual environment already exists${NC}"
+fi
+
+# Activate virtual environment
+echo -e "${YELLOW}  Activating virtual environment...${NC}"
+source .venv/bin/activate
+
+# Upgrade pip in venv
+echo -e "${YELLOW}  Upgrading pip...${NC}"
+python -m pip install --upgrade pip --quiet
+
+echo ""
+echo -e "${BLUE}[4/5] Installing/Updating Python dependencies...${NC}"
 
 # Check if requirements.txt exists
 if [ ! -f "requirements.txt" ]; then
@@ -90,15 +115,17 @@ fi
 
 # Install requirements
 echo -e "${YELLOW}  This may take a few minutes...${NC}"
-if $PYTHON_CMD -m pip install -r requirements.txt --quiet --upgrade; then
+if python -m pip install -r requirements.txt --quiet --upgrade; then
     echo -e "${GREEN}✓ All dependencies installed successfully${NC}"
 else
     echo -e "${YELLOW}⚠ Some dependencies may have failed to install.${NC}"
-    echo -e "${YELLOW}  You can try running manually: $PYTHON_CMD -m pip install -r requirements.txt${NC}"
+    echo -e "${YELLOW}  You can try running manually after activating venv:${NC}"
+    echo -e "${YELLOW}    source .venv/bin/activate${NC}"
+    echo -e "${YELLOW}    python -m pip install -r requirements.txt${NC}"
 fi
 
 echo ""
-echo -e "${BLUE}[4/5] Checking RSS feed configuration...${NC}"
+echo -e "${BLUE}[5/6] Checking RSS feed configuration...${NC}"
 
 # Check if rss.txt exists
 if [ -f "rss.txt" ]; then
@@ -111,7 +138,7 @@ else
 fi
 
 echo ""
-echo -e "${BLUE}[5/5] Checking AI provider (optional)...${NC}"
+echo -e "${BLUE}[6/6] Checking AI provider (optional)...${NC}"
 
 # Check if Ollama is running (non-blocking)
 if command -v curl &> /dev/null; then
@@ -133,10 +160,12 @@ echo -e "${GREEN}================================${NC}"
 echo ""
 echo -e "${BLUE}Next steps:${NC}"
 echo -e "  1. Run the configuration wizard to set up your AI provider and RSS feeds:"
-echo -e "     ${YELLOW}$PYTHON_CMD -m src.utils.config_wizard${NC}"
+echo -e "     ${YELLOW}./dailyfeedsanity.sh --config${NC}"
+echo -e "     ${YELLOW}OR: source .venv/bin/activate && python -m src.utils.config_wizard${NC}"
 echo ""
 echo -e "  2. After configuration, run the processor:"
-echo -e "     ${YELLOW}$PYTHON_CMD -m src.main${NC}"
+echo -e "     ${YELLOW}./dailyfeedsanity.sh${NC}"
+echo -e "     ${YELLOW}OR: source .venv/bin/activate && python -m src.main${NC}"
 echo ""
 
 # Ask if user wants to run the configuration wizard now
@@ -147,9 +176,9 @@ if [[ "$response" =~ ^[Yy]$ ]]; then
     echo ""
     echo -e "${BLUE}Starting configuration wizard...${NC}"
     echo ""
-    $PYTHON_CMD -m src.utils.config_wizard
+    python -m src.utils.config_wizard
 else
-    echo -e "${YELLOW}You can run the wizard later with: $PYTHON_CMD -m src.utils.config_wizard${NC}"
+    echo -e "${YELLOW}You can run the wizard later with: ./dailyfeedsanity.sh --config${NC}"
 fi
 
 echo ""

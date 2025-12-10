@@ -24,10 +24,16 @@ The RSS Feed Processor supports multiple AI providers for text summarization, ti
 No configuration needed if you're already using Ollama:
 
 ```bash
-python -m src.main
+./dailyfeedsanity.sh
+# OR: source .venv/bin/activate && python -m src.main
 ```
 
 ### Switching Providers
+
+**Via Config Wizard** (recommended):
+```bash
+./dailyfeedsanity.sh --config  # Interactive menu to select provider
+```
 
 **Via Config File** (`src/config.py`):
 ```python
@@ -36,9 +42,10 @@ AI_PROVIDER = 'gemini'  # or 'openai', 'claude', etc.
 
 **Via Command Line**:
 ```bash
-python -m src.main --ai-provider gemini
-python -m src.main --ai-provider openai
-python -m src.main --ai-provider claude
+./dailyfeedsanity.sh --ai-provider gemini
+./dailyfeedsanity.sh --ai-provider openai
+./dailyfeedsanity.sh --ai-provider claude
+# OR: source .venv/bin/activate && python -m src.main --ai-provider <provider>
 ```
 
 ## Provider Details

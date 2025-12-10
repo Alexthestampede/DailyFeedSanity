@@ -2,6 +2,17 @@
 
 Get the RSS Feed Processor running in 5 minutes!
 
+## First Time Setup
+
+**macOS/Linux users**: Run the automated setup first:
+```bash
+./setup.sh  # Creates venv, installs dependencies, runs config wizard
+```
+
+**Windows users**: See [README.md](README.md) for manual setup instructions.
+
+---
+
 ## Option 1: Local AI (Ollama) - Privacy First
 
 **Best for**: Privacy, no API costs, offline usage after setup
@@ -16,12 +27,18 @@ curl -fsSL https://ollama.com/install.sh | sh
 ollama pull granite4:tiny-h
 ```
 
-### Step 3: Run
+### Step 3: Run Setup (if not done already)
 ```bash
-python -m src.main
+./setup.sh  # Creates venv and installs dependencies
 ```
 
-### Step 4: View Output
+### Step 4: Run the Processor
+```bash
+./dailyfeedsanity.sh
+# OR: source .venv/bin/activate && python -m src.main
+```
+
+### Step 5: View Output
 Open `output/YYYY-MM-DD/index.html` in your browser!
 
 ---
@@ -38,12 +55,19 @@ Visit https://aistudio.google.com/app/apikey and create a free API key
 export GEMINI_API_KEY='your-key-here'
 ```
 
-### Step 3: Run
+### Step 3: Run Setup (if not done already)
 ```bash
-python -m src.main --ai-provider gemini
+./setup.sh  # Creates venv and installs dependencies
 ```
 
-### Step 4: View Output
+### Step 4: Configure and Run
+```bash
+./dailyfeedsanity.sh --config  # Select Gemini in wizard
+./dailyfeedsanity.sh
+# OR: source .venv/bin/activate && python -m src.main --ai-provider gemini
+```
+
+### Step 5: View Output
 Open `output/YYYY-MM-DD/index.html` in your browser!
 
 ---
@@ -52,7 +76,12 @@ Open `output/YYYY-MM-DD/index.html` in your browser!
 
 ### Add Your Own Feeds
 
-Edit `rss.txt` and add feed URLs (one per line):
+Use the configuration wizard:
+```bash
+./dailyfeedsanity.sh --config  # Interactive menu to add/manage feeds
+```
+
+Or edit `rss.txt` manually and add feed URLs (one per line):
 ```
 https://xkcd.com/rss.xml
 https://feeds.feedburner.com/TechCrunch
@@ -61,10 +90,14 @@ https://feeds.feedburner.com/TechCrunch
 ### Try Different Providers
 
 ```bash
-# Local options
-python -m src.main --ai-provider lm_studio
+# Using launcher script
+./dailyfeedsanity.sh --ai-provider lm_studio
+./dailyfeedsanity.sh --ai-provider openai
+./dailyfeedsanity.sh --ai-provider claude
 
-# Cloud options (require API keys)
+# OR activate venv and use Python directly
+source .venv/bin/activate
+python -m src.main --ai-provider lm_studio
 python -m src.main --ai-provider openai
 python -m src.main --ai-provider claude
 ```
@@ -72,13 +105,15 @@ python -m src.main --ai-provider claude
 ### Common Options
 
 ```bash
-# Get all news articles (not just last 24 hours)
+# Using launcher script
+./dailyfeedsanity.sh --all-entries  # Get all news articles (not just last 24 hours)
+./dailyfeedsanity.sh --debug        # Enable debug logging
+./dailyfeedsanity.sh --help         # See all options
+
+# OR activate venv and use Python directly
+source .venv/bin/activate
 python -m src.main --all-entries
-
-# Enable debug logging
 python -m src.main --debug
-
-# See all options
 python -m src.main --help
 ```
 
@@ -112,7 +147,7 @@ export ANTHROPIC_API_KEY='your-key'
 
 - **Full Documentation**: See [README.md](README.md)
 - **AI Provider Details**: See [AI_PROVIDERS.md](AI_PROVIDERS.md)
-- **Command Help**: Run `python -m src.main --help`
+- **Command Help**: Run `./dailyfeedsanity.sh --help`
 
 ---
 

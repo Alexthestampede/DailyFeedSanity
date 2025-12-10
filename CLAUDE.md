@@ -12,13 +12,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ### First-Time Setup (Recommended)
 
-Run the interactive configuration wizard to set up your AI provider and RSS feeds:
-
+**macOS/Linux**: Run the automated setup script:
 ```bash
+./setup.sh  # Creates venv, installs deps, runs config wizard
+```
+
+**Windows** or **manual setup**: Create venv and run config wizard:
+```bash
+python3 -m venv .venv
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+python -m pip install -r requirements.txt
 python -m src.utils.config_wizard
 ```
 
-This wizard will guide you through:
+The wizard will guide you through:
 - Selecting an AI provider (Ollama, LM Studio, OpenAI, Gemini, or Claude)
 - Configuring models and connection settings
 - Adding RSS feeds
@@ -27,26 +34,35 @@ This wizard will guide you through:
 
 ### Running the Processor
 
+**Using the launcher script** (recommended after setup):
 ```bash
-# Quick launch (one-click script)
+# Quick launch
 ./dailyfeedsanity.sh
 
-# Basic run (uses Ollama by default)
+# With configuration wizard
+./dailyfeedsanity.sh --config
+
+# With options
+./dailyfeedsanity.sh --debug
+./dailyfeedsanity.sh --validate-images
+./dailyfeedsanity.sh --ai-provider lm_studio
+./dailyfeedsanity.sh --debug --ai-provider lm_studio
+```
+
+**Using Python directly** (activate venv first):
+```bash
+source .venv/bin/activate  # Windows: .venv\Scripts\activate
+
+# Basic run (uses configured AI provider)
 python -m src.main
 
-# With debug logging
+# With options
 python -m src.main --debug
-
-# Enable image validation (slower)
 python -m src.main --validate-images
-
-# Use LM Studio instead of Ollama
 python -m src.main --ai-provider lm_studio
-
-# Combine options
 python -m src.main --debug --ai-provider lm_studio
 
-# Test AI summarization on any URL (works with both Ollama and LM Studio)
+# Test AI summarization on any URL
 python scripts/test_ollama_summarizer.py https://example.com/article
 python scripts/test_ollama_summarizer.py --ai-provider lm_studio https://example.com/article
 
