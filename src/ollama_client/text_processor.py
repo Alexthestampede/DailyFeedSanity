@@ -20,15 +20,19 @@ class OllamaTextClient:
     Text processor using Ollama for summarization and title generation.
     """
 
-    def __init__(self, model=TEXT_MODEL):
+    def __init__(self, model=TEXT_MODEL, base_url=None):
         """
         Initialize text processor.
 
         Args:
             model: Ollama model name for text processing
+            base_url: Ollama server base URL (optional, uses config default if not provided)
         """
         self.model = model
-        self.client = OllamaClient()
+        if base_url:
+            self.client = OllamaClient(base_url=base_url)
+        else:
+            self.client = OllamaClient()
 
     def detect_clickbait(self, title, text):
         """

@@ -1,6 +1,6 @@
 # Configuration Wizard
 
-Interactive setup tool for the RSS Feed Processor.
+Interactive setup tool for DailyFeedSanity RSS Feed Processor.
 
 ## Quick Start
 
@@ -66,8 +66,8 @@ Current Configuration
 ======================================================================
 AI Provider: Ollama
 Server URL: http://localhost:11434
-Text Model: llama2
-Vision Model: llava
+Text Model: granite4:tiny-h
+Vision Model: qwen3-vl:4b
 RSS Feeds: 5 configured
 
 Options:
@@ -90,8 +90,8 @@ Settings are saved to `.config.json` in the project root:
 {
   "ai_provider": "ollama",
   "ollama_base_url": "http://localhost:11434",
-  "text_model": "llama2",
-  "vision_model": "llava",
+  "text_model": "granite4:tiny-h",
+  "vision_model": "qwen3-vl:4b",
   "rss_feeds": [
     "https://example.com/feed1",
     "https://example.com/feed2"
@@ -151,11 +151,12 @@ When adding RSS feeds:
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull a model
-ollama pull llama2
+# Pull models
+ollama pull granite4:tiny-h       # Text model
+ollama pull qwen3-vl:4b           # Vision model (optional)
 
-# Pull a vision model (optional)
-ollama pull llava
+# OR pull the all-in-one model (requires 16GB+ VRAM)
+ollama pull qwen3-vl:30b-a3b      # Excellent for both text and vision
 
 # Run wizard
 python -m src.utils.config_wizard
@@ -266,7 +267,7 @@ ollama serve
 ollama list
 
 # Pull a model
-ollama pull llama2
+ollama pull granite4:tiny-h
 ```
 
 **For LM Studio:**

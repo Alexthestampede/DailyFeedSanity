@@ -29,15 +29,19 @@ class LMStudioTextClient(BaseTextProcessor):
     for transparent provider switching.
     """
 
-    def __init__(self, model=LM_STUDIO_TEXT_MODEL):
+    def __init__(self, model=LM_STUDIO_TEXT_MODEL, base_url=None):
         """
         Initialize text processor.
 
         Args:
             model: LM Studio model name for text processing
+            base_url: LM Studio server base URL (optional, uses config default if not provided)
         """
         self.model = model
-        self.client = LMStudioClient()
+        if base_url:
+            self.client = LMStudioClient(base_url=base_url)
+        else:
+            self.client = LMStudioClient()
 
     def detect_clickbait(self, title: str, text: str) -> bool:
         """

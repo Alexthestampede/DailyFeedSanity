@@ -18,7 +18,7 @@ class FeedLanguageDetector:
     Manual overrides take highest priority.
     """
 
-    def __init__(self, ai_client=None, cache_file=None, override_file=None, model=TEXT_MODEL):
+    def __init__(self, ai_client=None, cache_file=None, override_file=None, model=None):
         """
         Initialize feed language detector.
 
@@ -26,9 +26,8 @@ class FeedLanguageDetector:
             ai_client: BaseAIClient instance (optional, will create default if not provided)
             cache_file: Path to cache file (default: from config.FEED_LANGUAGE_CACHE_FILE)
             override_file: Path to override file (default: from config.FEED_LANGUAGE_OVERRIDE_FILE)
-            model: AI model to use for language detection
+            model: AI model to use for language detection (optional, will load from user config or use default)
         """
-        self.model = model
         self.cache_file = cache_file or FEED_LANGUAGE_CACHE_FILE
         self.override_file = override_file or FEED_LANGUAGE_OVERRIDE_FILE
         self.cache = self._load_cache()
@@ -41,6 +40,13 @@ class FeedLanguageDetector:
             ai_client, _, _ = create_ai_client_with_fallback()
 
         self.client = ai_client
+
+        # Determine model: use provided model, or load from user config, or fall back to default
+        if model is not None:
+            self.model = model
+        else:
+            # Try to load model from user config (.config.json)
+            self.model = self._get_model_from_config()
 
     def _load_cache(self):
         """
@@ -122,6 +128,27 @@ class FeedLanguageDetector:
         except Exception as e:
             logger.error(f"Failed to load language overrides from {self.override_file}: {e}")
             return {}
+
+    def _get_model_from_config(self):
+        """
+        Get the text model from user configuration or fall back to default.
+
+        Returns:
+            Model name string
+        """
+        try:
+            from ..utils.config_wizard import load_config
+            user_config = load_config()
+            if user_config and 'text_model' in user_config:
+                model = user_config['text_model']
+                logger.debug(f"Using text model from user config: {model}")
+                return model
+        except Exception as e:
+            logger.debug(f"Could not load user config for model: {e}")
+
+        # Fall back to default from config.py
+        logger.debug(f"Using default text model: {TEXT_MODEL}")
+        return TEXT_MODEL
 
     def _extract_domain(self, feed_url):
         """

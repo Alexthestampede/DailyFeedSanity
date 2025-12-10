@@ -30,15 +30,19 @@ class LMStudioVisionClient:
     for transparent provider switching.
     """
 
-    def __init__(self, model=LM_STUDIO_VISION_MODEL):
+    def __init__(self, model=LM_STUDIO_VISION_MODEL, base_url=None):
         """
         Initialize vision processor.
 
         Args:
             model: LM Studio model name for vision processing
+            base_url: LM Studio server base URL (optional, uses config default if not provided)
         """
         self.model = model
-        self.client = LMStudioClient()
+        if base_url:
+            self.client = LMStudioClient(base_url=base_url)
+        else:
+            self.client = LMStudioClient()
         logger.info(f"Initialized LM Studio vision client with model: {model}")
 
     def encode_image_from_url(self, image_url, session=None):

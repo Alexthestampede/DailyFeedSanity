@@ -60,14 +60,14 @@ python -m src.main --ai-provider claude
 ```python
 # src/config.py
 AI_PROVIDER = 'ollama'
-OLLAMA_BASE_URL = "http://192.168.2.150:11434"
-TEXT_MODEL = "G47bLDMC"  # Your text model
-VISION_MODEL = "qwen34bvla"  # Your vision model
+OLLAMA_BASE_URL = "http://localhost:11434"
+TEXT_MODEL = "granite4:tiny-h"  # Your text model
+VISION_MODEL = "qwen3-vl:4b"  # Your vision model
 ```
 
 **Setup:**
 1. Install Ollama: https://ollama.com/
-2. Pull models: `ollama pull G47bLDMC` (or your preferred model)
+2. Pull models: `ollama pull granite4:tiny-h ` (or your preferred model)
 3. Run the application
 
 ---
@@ -89,7 +89,7 @@ VISION_MODEL = "qwen34bvla"  # Your vision model
 ```python
 # src/config.py
 AI_PROVIDER = 'lm_studio'
-LM_STUDIO_BASE_URL = "http://192.168.2.150:1234"
+LM_STUDIO_BASE_URL = "http://localhost:1234"
 LM_STUDIO_TEXT_MODEL = "qwen/qwen3-vl-4b"
 LM_STUDIO_VISION_MODEL = "qwen/qwen3-vl-4b"
 ```

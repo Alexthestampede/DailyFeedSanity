@@ -23,10 +23,10 @@ wheels/
 .installed.cfg
 *.egg
 
-# Output
-output/
-logs/
-temp/
+# Output (root-level only, not src/output/)
+/output/
+/logs/
+/temp/
 
 # Cache files
 .feed_type_cache.json
@@ -36,6 +36,11 @@ temp/
 feed_type_overrides.txt
 feed_language_overrides.txt
 .config.json
+rss.txt
+
+# Development stuff
+project description
+.dev/
 
 # IDE
 .vscode/

@@ -8,12 +8,12 @@ import os
 AI_PROVIDER = 'ollama'  # Default to Ollama for backward compatibility
 
 # Ollama Configuration
-OLLAMA_BASE_URL = "http://192.168.2.150:11434"
-TEXT_MODEL = "G47bLDMC"  # 4.2GB - for text summarization
-VISION_MODEL = "qwen34bvla"  # 3.3GB - for image OCR/validation
+OLLAMA_BASE_URL = "http://localhost:11434"
+TEXT_MODEL = "granite4:tiny-h"  # Small, fast model for text summarization
+VISION_MODEL = "qwen3-vl:4b"  # Vision-capable model for image OCR/validation
 
 # LM Studio Configuration
-LM_STUDIO_BASE_URL = "http://192.168.2.150:1234"
+LM_STUDIO_BASE_URL = "http://localhost:1234"
 LM_STUDIO_TEXT_MODEL = "qwen/qwen3-vl-4b"  # Model for text summarization (use full identifier from /v1/models)
 LM_STUDIO_VISION_MODEL = "qwen/qwen3-vl-4b"  # Model for vision processing (must support image inputs)
 # Note: LM Studio uses OpenAI-compatible API format
@@ -127,7 +127,7 @@ LOG_FORMAT = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 LOG_DATE_FORMAT = '%Y-%m-%d %H:%M:%S'
 
 # Output HTML Settings
-HTML_TITLE = "Daily RSS Digest"
+HTML_TITLE = "DailyFeedSanity"
 DATE_FORMAT = '%Y-%m-%d'
 DATETIME_FORMAT = '%Y-%m-%d %H:%M:%S'
 

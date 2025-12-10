@@ -31,7 +31,7 @@ source ~/.bashrc
 
 ### 3. Configure Provider
 
-Edit `/home/alexthestampede/Aish/RSS copy (1)/src/config.py`:
+Edit `src/config.py`:
 
 ```python
 AI_PROVIDER = 'openai'  # Change from 'ollama' to 'openai'
@@ -51,7 +51,7 @@ python -m src.main --debug
 
 ## Configuration Options
 
-You can customize the models used in `/home/alexthestampede/Aish/RSS copy (1)/src/config.py`:
+You can customize the models used in `src/config.py`:
 
 ```python
 # OpenAI Configuration
@@ -185,7 +185,7 @@ export OPENAI_API_KEY='sk-your-key-here'
 If you're processing many articles, you may hit rate limits. Solutions:
 
 1. Use `gpt-4o-mini` instead of `gpt-4o` for text (higher rate limits)
-2. Add delays between requests (modify `/home/alexthestampede/Aish/RSS copy (1)/src/config.py`)
+2. Add delays between requests (modify `src/config.py`)
 3. Upgrade your OpenAI account tier
 
 ### High Costs
@@ -209,7 +209,7 @@ openai_provider/
 └── vision_processor.py  # Image analysis (similar to OllamaVisionClient)
 ```
 
-All classes implement the base interfaces defined in `/home/alexthestampede/Aish/RSS copy (1)/src/ai_client/base.py`, ensuring consistency across providers.
+All classes implement the base interfaces defined in `src/ai_client/base.py`, ensuring consistency across providers.
 
 ## Security Notes
 

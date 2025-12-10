@@ -23,15 +23,19 @@ class OllamaVisionClient:
     Vision processor using Ollama for image analysis.
     """
 
-    def __init__(self, model=VISION_MODEL):
+    def __init__(self, model=VISION_MODEL, base_url=None):
         """
         Initialize vision processor.
 
         Args:
             model: Ollama model name for vision processing
+            base_url: Ollama server base URL (optional, uses config default if not provided)
         """
         self.model = model
-        self.client = OllamaClient()
+        if base_url:
+            self.client = OllamaClient(base_url=base_url)
+        else:
+            self.client = OllamaClient()
 
     def encode_image_from_url(self, image_url, session=None):
         """

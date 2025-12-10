@@ -93,7 +93,16 @@ class OllamaClient:
                 json=payload,
                 timeout=REQUEST_TIMEOUT * 3  # Longer timeout for generation
             )
-            response.raise_for_status()
+
+            # Check for errors and try to get detailed error message from Ollama
+            if not response.ok:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', f"HTTP {response.status_code}")
+                    logger.error(f"Ollama generation failed: {error_msg}")
+                except Exception:
+                    logger.error(f"Ollama generation failed: HTTP {response.status_code}")
+                return None
 
             data = response.json()
             generated_text = data.get('response', '').strip()
@@ -136,7 +145,16 @@ class OllamaClient:
                 json=payload,
                 timeout=REQUEST_TIMEOUT * 3
             )
-            response.raise_for_status()
+
+            # Check for errors and try to get detailed error message from Ollama
+            if not response.ok:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', f"HTTP {response.status_code}")
+                    logger.error(f"Ollama chat failed: {error_msg}")
+                except Exception:
+                    logger.error(f"Ollama chat failed: HTTP {response.status_code}")
+                return None
 
             data = response.json()
             message = data.get('message', {})

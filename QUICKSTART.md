@@ -13,7 +13,7 @@ curl -fsSL https://ollama.com/install.sh | sh
 
 ### Step 2: Pull a Model
 ```bash
-ollama pull llama2
+ollama pull granite4:tiny-h
 ```
 
 ### Step 3: Run

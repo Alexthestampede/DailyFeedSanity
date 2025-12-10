@@ -5,7 +5,7 @@ Standalone test script for AI summarizer (Ollama, LM Studio, etc.)
 Usage:
     python scripts/test_ollama_summarizer.py <url>
     python scripts/test_ollama_summarizer.py <url> --author "Francesca Testa"
-    python scripts/test_ollama_summarizer.py <url> --model "G47bLDMC" --verbose
+    python scripts/test_ollama_summarizer.py <url> --model "granite4:tiny-h" --verbose
     python scripts/test_ollama_summarizer.py <url> --ai-provider lm_studio
 """
 import argparse
@@ -49,7 +49,7 @@ Examples:
   %(prog)s https://example.com/article --author "Francesca Testa"
 
   # Verbose output with custom model
-  %(prog)s https://example.com/article --model "G47bLDMC" --verbose
+  %(prog)s https://example.com/article --model "granite4:tiny-h" --verbose
 
   # Use LM Studio instead of Ollama
   %(prog)s https://example.com/article --ai-provider lm_studio

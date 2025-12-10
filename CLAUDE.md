@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-RSS feed processor that downloads webcomics and summarizes news articles using AI (Ollama or LM Studio). The system processes feeds concurrently, generates summaries, and creates a browsable HTML page with the daily content.
+**DailyFeedSanity** is an RSS feed processor that downloads webcomics and summarizes news articles using AI. The system processes feeds concurrently, generates summaries, and creates a browsable HTML page with the daily content.
 
 **Current Status**: Fully functional - 12/12 comics downloading, 34 articles from news feeds being processed.
 
@@ -157,58 +157,17 @@ feedburner.com/psblog = Italian
 ## Special Case Handling
 
 ### Mixed Feeds (News + Comics)
-Some RSS feeds mix news posts with comic updates. The system filters to find comic entries:
+Some RSS feeds mix news posts with comic updates. The system uses filtering logic in `feed_manager.py` to identify comic entries from mixed feeds. Specific patterns are implemented for sites like Penny Arcade, Wondermark, and Incase.
 
-- **Penny Arcade**: Look for `/comic/` in URL (news posts have `/news/post/`)
-- **Wondermark**: Comic titles start with `#NUMBER` pattern (e.g., `#1577`)
-- **Incase**: Comic entries have `<img>` tags in RSS description
+### Comic Extraction
+The system supports various webcomic formats through specialized extractors in `src/comics/extractors.py`. Each comic site may have unique requirements:
 
-### Comic Extraction Patterns
+- **Custom Extractors**: Created for comics with non-standard image locations or formats
+- **Default Extractor**: Handles standard RSS feeds with direct image links
+- **Thumbnail Handling**: Automatically removes WordPress dimension suffixes (e.g., `-150x150`)
+- **Multi-page Comics**: Supports comics with multiple images per entry
 
-All comics now working with specific extractors in `src/comics/extractors.py`:
-
-#### Evil Inc
-- **Pattern**: `wp-content/uploads/YYYY/MM/YYYYMMDD_evil.jpg` (composite image)
-- **Important**: Comics have 6 individual panels (evil01-06.png) PLUS a composite .jpg file
-- **Extract**: The composite .jpg (e.g., 20251127_evil.jpg) contains all panels - **2000x1391**
-- **Don't Use**: og:image meta tag (points to middle panel only)
-
-#### Penny Arcade
-- **Pattern**: `assets.penny-arcade.com/comics/YYYYMMDD-XXXXXXXX.jpg`
-- **Format Changed**: Now single image (no more p1/p2/p3 panels)
-- **Mixed Feed**: Filter for entries with `/comic/` in URL
-
-#### Oglaf
-- **Pattern**: `media.oglaf.com/comic/NAME.jpg`
-- **Skip**: Title cards have `tt` prefix (e.g., ttgoat.jpg)
-- **Multi-page**: May have multiple images (goat1.jpg, goat2.jpg, etc.)
-- **Age Confirmation**: Handled automatically with allow_redirects
-
-#### Widdershins
-- **Pattern**: `widdershinscomic.com/comics/TIMESTAMP-NUMBER.png`
-- **Example**: `1764796746-125.png` (timestamp + sequential number)
-
-#### Wondermark
-- **Pattern**: `wondermark.com/wp-content/uploads/YYYY/MM/YYYY-MM-DD-####xxxx.png`
-- **Example**: `2025-11-10-1577robo.png`
-- **Mixed Feed**: Filter for titles starting with `#`
-
-#### Incase (Buttsmithy)
-- **Pattern**: `incase.buttsmithy.com/wp-content/uploads/YYYY/MM/FILENAME.jpg`
-- **Variable Names**: Filenames vary but are sequential (e.g., OG-10.jpg, OG-11.jpg)
-- **Mixed Feed**: Filter for entries with images in RSS description
-
-#### Gunnerkrigg Court
-- **Pattern**: Extract from `<img class="comic_image">` on comic page
-
-#### Savestate
-- **Pattern**: Standard RSS extraction
-- **Special**: Remove `-{width}x{height}` dimension suffixes from URLs
-
-#### Other Comics
-- **Questionable Content, XKCD, Irovedout, Totempole666**: Use default extractor
-- **Important**: WordPress sites often include thumbnail URLs with `-150x150` suffix
-- **Fix**: DefaultExtractor removes dimension patterns: `-\d+x\d+` before extension
+For specific implementation details, see code comments in `src/comics/extractors.py`.
 
 ### News Articles
 - Filter and extract clean text using `trafilatura` library before sending to AI provider
@@ -314,16 +273,23 @@ Edit constants in `src/config.py`:
 
 **For Ollama**:
 ```python
-OLLAMA_TEXT_MODEL = "G47bLDMC"        # For summarization
-OLLAMA_VISION_MODEL = "qwen34bvla"     # For image validation
-OLLAMA_BASE_URL = "http://192.168.2.150:11434"
+OLLAMA_TEXT_MODEL = "granite4:tiny-h"        # For summarization
+OLLAMA_VISION_MODEL = "qwen3-vl:4b"          # For image validation
+OLLAMA_BASE_URL = "http://localhost:11434"
 ```
 
 **For LM Studio**:
 ```python
-LM_STUDIO_MODEL = "qwen3-vl-4b"        # For summarization
-LM_STUDIO_BASE_URL = "http://192.168.2.150:1234"
+LM_STUDIO_MODEL = "qwen3-vl:4b"              # For summarization
+LM_STUDIO_BASE_URL = "http://localhost:1234"
 ```
+
+**Recommended Vision Model**:
+- **qwen3-vl:30b-a3b** - For users with sufficient VRAM (16GB+)
+  - Excellent vision and text capabilities in a single model
+  - Fast inference with good accuracy
+  - Can handle both summarization and image analysis
+  - Use: `ollama pull qwen3-vl:30b-a3b`
 
 ## Troubleshooting
 
@@ -377,16 +343,16 @@ LM_STUDIO_BASE_URL = "http://192.168.2.150:1234"
 ### AI Provider Errors
 
 **Ollama**:
-- Verify Ollama is running: `curl http://192.168.2.150:11434/api/tags`
+- Verify Ollama is running: `curl http://localhost:11434/api/tags`
 - Check model is available: `ollama list`
-- Pull models if needed: `ollama pull G47bLDMC`
+- Pull models if needed: `ollama pull granite4:tiny-h`
 
 **LM Studio**:
-- Verify LM Studio server is running: `curl http://192.168.2.150:1234/v1/models`
+- Verify LM Studio server is running: `curl http://localhost:1234/v1/models`
 - Check model is loaded in LM Studio GUI
 - Ensure the correct model name is configured in `src/config.py`
 
 **General**:
 - Try switching providers with `--ai-provider` flag to test if issue is provider-specific
-- Check network connectivity to the AI server
+- Check network connectivity to the AI server (use localhost for local providers)
 - Review logs with `--debug` flag for detailed error messages

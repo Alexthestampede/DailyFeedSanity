@@ -34,7 +34,8 @@ An intelligent RSS feed processor that downloads webcomics and summarizes news a
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Pull a model
-ollama pull llama2
+
+ollama pull granite4:tiny-h
 
 # Run the processor
 python -m src.main
@@ -71,7 +72,7 @@ python -m src.main --help
 
 ```bash
 # Clone repository
-cd /path/to/RSS_copy_1
+cd /path/to/DailyFeedSanity
 
 # Install dependencies
 pip install -r requirements.txt

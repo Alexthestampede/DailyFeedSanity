@@ -53,6 +53,11 @@ Options:
   - Context size warnings for models under 4k
   - Vision model optional
 
+**Recommended Models**:
+- **Text**: `granite4:tiny-h` - Fast, efficient, good quality summaries
+- **Vision**: `qwen3-vl:4b` - Vision-capable, good for image analysis
+- **All-in-one**: `qwen3-vl:30b-a3b` - For users with 16GB+ VRAM, handles both text and vision excellently
+
 **Setup Process**:
 1. Enter Ollama server URL (or use default)
 2. Wizard tests connection and lists available models
@@ -77,6 +82,9 @@ Models with context < 4096 show a warning during selection.
   - Lists loaded models via OpenAI-compatible API
   - Single model for both text and vision tasks
   - Simpler setup than Ollama
+
+**Recommended Models**:
+- **All-in-one**: `qwen3-vl:4b` or `qwen3-vl:30b-a3b` - Handles both text and vision
 
 **Setup Process**:
 1. Enter LM Studio server URL (or use default)
@@ -122,9 +130,9 @@ The wizard saves configuration to `.config.json` in the project root:
 ```json
 {
   "ai_provider": "ollama",
-  "ollama_base_url": "http://192.168.2.150:11434",
-  "text_model": "G47bLDMC",
-  "vision_model": "qwen34bvla",
+  "ollama_base_url": "http://localhost:11434",
+  "text_model": "granite4:tiny-h",
+  "vision_model": "qwen3-vl:4b",
   "rss_feeds": [
     "https://example.com/feed1",
     "https://example.com/feed2"
@@ -613,7 +621,7 @@ The wizard is provided as a convenience tool for easier setup, especially for fi
 ollama list
 
 # Pull a model if needed
-ollama pull llama2
+ollama pull granite4:tiny-h
 ```
 
 **LM Studio**:
@@ -690,15 +698,18 @@ Best for users who want complete privacy and local processing:
 curl -fsSL https://ollama.com/install.sh | sh
 
 # Pull models
-ollama pull llama2
-ollama pull llava  # Vision model (optional)
+ollama pull granite4:tiny-h       # Text model
+ollama pull qwen3-vl:4b           # Vision model (optional)
+
+# OR pull the all-in-one model (requires 16GB+ VRAM)
+ollama pull qwen3-vl:30b-a3b      # Both text and vision
 
 # Run wizard
 python -m src.utils.config_wizard
 # Select [1] Ollama
 # Use default URL (http://localhost:11434)
-# Select llama2 for text
-# Select llava for vision (or skip)
+# Select granite4:tiny-h for text (or qwen3-vl:30b-a3b for everything)
+# Select qwen3-vl:4b for vision (or skip if using 30b model)
 # Add RSS feeds
 ```
 

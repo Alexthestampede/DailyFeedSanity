@@ -1,6 +1,6 @@
 # OpenAI Provider - Quick Start Guide
 
-This guide will help you set up and use the OpenAI provider for the RSS Feed Processor.
+This guide will help you set up and use the OpenAI provider for DailyFeedSanity RSS Feed Processor.
 
 ## What's New
 
@@ -52,7 +52,7 @@ set OPENAI_API_KEY=sk-your-key-here
 
 ### Step 3: Configure the Provider
 
-Edit `/home/alexthestampede/Aish/RSS copy (1)/src/config.py`:
+Edit `src/config.py`:
 
 ```python
 # Change this line:
@@ -67,8 +67,6 @@ AI_PROVIDER = 'openai'
 Run the test script to verify everything works:
 
 ```bash
-cd "/home/alexthestampede/Aish/RSS copy (1)"
-
 # Test API connection
 python scripts/test_openai_provider.py --test health
 
@@ -93,7 +91,7 @@ python -m src.main --debug
 
 ### Model Selection
 
-Edit `/home/alexthestampede/Aish/RSS copy (1)/src/config.py` to customize models:
+Edit `src/config.py` to customize models:
 
 ```python
 # Text summarization model
@@ -193,7 +191,7 @@ If it's empty, set it again and restart your terminal.
 
 ## Switching Back to Ollama/LM Studio
 
-To switch back to local providers, edit `/home/alexthestampede/Aish/RSS copy (1)/src/config.py`:
+To switch back to local providers, edit `src/config.py`:
 
 ```python
 # For Ollama
@@ -256,7 +254,7 @@ processor = OpenAITextProcessor(
 
 ## Implementation Details
 
-The OpenAI provider is located in `/home/alexthestampede/Aish/RSS copy (1)/src/openai_provider/`:
+The OpenAI provider is located in `src/openai_provider/`:
 
 ```
 openai_provider/
