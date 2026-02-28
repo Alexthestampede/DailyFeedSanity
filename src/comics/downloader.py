@@ -5,7 +5,6 @@ from pathlib import Path
 from PIL import Image
 from .extractors import get_extractor
 from ..utils.logging_config import get_logger
-from ..ollama_client.vision_processor import OllamaVisionClient
 
 logger = get_logger(__name__)
 
@@ -15,17 +14,18 @@ class ComicDownloader:
     Downloads and validates comic images.
     """
 
-    def __init__(self, validate_images=False, use_vision=True):
+    def __init__(self, validate_images=False, use_vision=True, vision_processor=None):
         """
         Initialize comic downloader.
 
         Args:
             validate_images: Whether to validate images with vision model
             use_vision: Whether to use vision model for Oglaf multi-page detection
+            vision_processor: DomainVisionProcessor instance (optional)
         """
         self.validate_images = validate_images
         self.use_vision = use_vision
-        self.vision_client = OllamaVisionClient() if validate_images else None
+        self.vision_processor = vision_processor
 
     def download_comic(self, feed_data, output_dir):
         """
@@ -43,7 +43,12 @@ class ComicDownloader:
 
         try:
             # Get appropriate extractor
-            extractor = get_extractor(feed_data, session=feed_data.get('session'), use_vision=self.use_vision)
+            extractor = get_extractor(
+                feed_data,
+                session=feed_data.get('session'),
+                use_vision=self.use_vision,
+                vision_processor=self.vision_processor
+            )
 
             # Download images
             downloaded_files = extractor.download_images(output_dir)
@@ -57,7 +62,7 @@ class ComicDownloader:
                 }
 
             # Validate images if requested
-            if self.validate_images:
+            if self.validate_images and self.vision_processor:
                 validation_results = self._validate_images(downloaded_files)
             else:
                 validation_results = None
@@ -95,15 +100,14 @@ class ComicDownloader:
         Returns:
             List of validation results
         """
-        if not self.vision_client:
+        if not self.vision_processor:
             return None
 
         results = []
 
         for image_path in image_paths:
             try:
-                # Basic validation (format, size)
-                validation = self.vision_client.validate_comic_image(image_path)
+                validation = self.vision_processor.validate_comic_image(image_path)
                 results.append({
                     'path': image_path,
                     'valid': validation['valid'],
@@ -112,7 +116,6 @@ class ComicDownloader:
                     'size': validation.get('size'),
                     'reason': validation.get('reason')
                 })
-
             except Exception as e:
                 logger.error(f"Error validating image {image_path}: {e}")
                 results.append({
@@ -135,10 +138,8 @@ class ComicDownloader:
         """
         try:
             with Image.open(image_path) as img:
-                # Try to verify the image
                 img.verify()
                 return True
-
         except Exception as e:
             logger.error(f"Invalid image format for {image_path}: {e}")
             return False
@@ -157,23 +158,19 @@ class ComicDownloader:
         results = []
 
         for feed_data in comic_feeds:
-            # Comics should only have 1 entry (latest), but handle entries list
             entries = feed_data.get('entries', [])
             if entries:
-                # Create single-entry feed_data for download_comic
                 single_entry_data = {
                     **feed_data,
-                    'entry': entries[0]  # Use first (and only) entry
+                    'entry': entries[0]
                 }
                 result = self.download_comic(single_entry_data, output_dir)
                 results.append(result)
             else:
                 logger.warning(f"No entries for {feed_data.get('feed_name', 'Unknown')}")
 
-        # Summary
         successful = sum(1 for r in results if r['success'])
         failed = len(results) - successful
-
         logger.info(f"Batch download complete: {successful} successful, {failed} failed")
 
         return results

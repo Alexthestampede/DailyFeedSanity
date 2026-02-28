@@ -236,6 +236,7 @@ class HTMLGenerator:
         date = article.get('date', '')
         is_clickbait = article.get('is_clickbait', False)
         clickbait_detected_by = article.get('clickbait_detected_by')
+        is_ad = article.get('is_ad', False)
 
         # Format date
         if isinstance(date, datetime):
@@ -246,20 +247,27 @@ class HTMLGenerator:
         # Author info
         author_info = f"| Author: {author}" if author else ""
 
+        # Build CSS class and badges
+        extra_classes = ""
+        badges = ""
+
+        # Ad/sponsored badge (takes priority in display)
+        if is_ad:
+            extra_classes += " ad"
+            badges += '<span class="ad-badge">SPONSORED/AD</span>'
+
         # Clickbait styling with detection source
-        clickbait_class = " clickbait" if is_clickbait else ""
         if is_clickbait:
+            extra_classes += " clickbait"
             if clickbait_detected_by == "both":
                 badge_text = "CLICKBAIT (AI + Author)"
-            elif clickbait_detected_by == "ollama":
+            elif clickbait_detected_by == "ai":
                 badge_text = "CLICKBAIT (AI Detected)"
             elif clickbait_detected_by == "author":
                 badge_text = "CLICKBAIT (Known Author)"
             else:
                 badge_text = "CLICKBAIT"
-            clickbait_badge = f'<span class="clickbait-badge">{badge_text}</span>'
-        else:
-            clickbait_badge = ""
+            badges += f'<span class="clickbait-badge">{badge_text}</span>'
 
         # Generate article HTML
         article_html = ARTICLE_ITEM_TEMPLATE.format(
@@ -269,8 +277,8 @@ class HTMLGenerator:
             author_info=author_info,
             summary=self._escape_html(summary),
             url=url,
-            clickbait_class=clickbait_class,
-            clickbait_badge=clickbait_badge
+            clickbait_class=extra_classes,
+            clickbait_badge=badges
         )
 
         return article_html

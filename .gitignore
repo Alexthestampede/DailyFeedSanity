@@ -14,7 +14,9 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
+lib/*
+!lib/__init__.py
+!lib/modulle/
 lib64/
 parts/
 sdist/

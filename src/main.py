@@ -248,7 +248,8 @@ def main():
             use_vision = not args.no_vision
             comic_downloader = ComicDownloader(
                 validate_images=args.validate_images,
-                use_vision=use_vision
+                use_vision=use_vision,
+                vision_processor=vision_processor
             )
             comic_results = comic_downloader.batch_download(comic_feeds, output_folder)
 

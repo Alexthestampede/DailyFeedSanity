@@ -21,7 +21,7 @@ def test_known_feed(feed_url):
     print(f"{'='*80}")
 
     parser = FeedParser()
-    classifier = FeedClassifier(use_ollama_detection=True)
+    classifier = FeedClassifier(use_ai_detection=True)
 
     # Parse feed
     print("Parsing feed...")
@@ -71,7 +71,7 @@ def test_unknown_feed(feed_url):
     print(f"{'='*80}")
 
     parser = FeedParser()
-    classifier = FeedClassifier(use_ollama_detection=True)
+    classifier = FeedClassifier(use_ai_detection=True)
 
     # Parse feed
     print("Parsing feed...")

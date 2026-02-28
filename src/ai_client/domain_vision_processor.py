@@ -1,41 +1,45 @@
 """
-Vision processing with Ollama for RSS Feed Processor
+Domain-specific vision processor for DailyFeedSanity.
+
+Wraps ModuLLe's generic BaseVisionProcessor with comic-specific methods:
+- Image encoding (URL and file)
+- Oglaf multi-page detection
+- Comic image validation
+- Image description
+
+All methods call the underlying analyze_image() or handle images directly.
 """
-import base64
 import re
-from io import BytesIO
+import base64
 from PIL import Image
-from .client import OllamaClient
+from typing import Optional
 from ..utils.logging_config import get_logger
 from ..utils.http_client import fetch_url
 from ..config import (
-    VISION_MODEL,
     VISION_TEMPERATURE,
     MIN_IMAGE_SIZE,
-    ALLOWED_IMAGE_FORMATS
+    ALLOWED_IMAGE_FORMATS,
 )
 
 logger = get_logger(__name__)
 
 
-class OllamaVisionClient:
+class DomainVisionProcessor:
     """
-    Vision processor using Ollama for image analysis.
+    Domain-specific vision processor that wraps ModuLLe's generic vision processor.
+
+    Provides comic image validation, Oglaf page detection, and image description
+    by crafting domain-specific prompts and calling the underlying analyze_image() method.
     """
 
-    def __init__(self, model=VISION_MODEL, base_url=None):
+    def __init__(self, vision_processor):
         """
-        Initialize vision processor.
+        Initialize domain vision processor.
 
         Args:
-            model: Ollama model name for vision processing
-            base_url: Ollama server base URL (optional, uses config default if not provided)
+            vision_processor: ModuLLe BaseVisionProcessor instance (has analyze_image() method)
         """
-        self.model = model
-        if base_url:
-            self.client = OllamaClient(base_url=base_url)
-        else:
-            self.client = OllamaClient()
+        self.processor = vision_processor
 
     def encode_image_from_url(self, image_url, session=None):
         """
@@ -51,12 +55,9 @@ class OllamaVisionClient:
         try:
             response = fetch_url(image_url, session=session)
             image_data = response.content
-
-            # Encode to base64
             encoded = base64.b64encode(image_data).decode('utf-8')
             logger.debug(f"Encoded image from {image_url}")
             return encoded
-
         except Exception as e:
             logger.error(f"Failed to encode image from {image_url}: {e}")
             return None
@@ -74,11 +75,9 @@ class OllamaVisionClient:
         try:
             with open(image_path, 'rb') as f:
                 image_data = f.read()
-
             encoded = base64.b64encode(image_data).decode('utf-8')
             logger.debug(f"Encoded image from {image_path}")
             return encoded
-
         except Exception as e:
             logger.error(f"Failed to encode image from {image_path}: {e}")
             return None
@@ -97,13 +96,11 @@ class OllamaVisionClient:
         logger.info(f"Detecting Oglaf page count from arc image: {arc_image_url}")
 
         try:
-            # Encode image
             encoded_image = self.encode_image_from_url(arc_image_url, session=session)
             if not encoded_image:
                 logger.error("Failed to encode arc image")
                 return 1
 
-            # Prompt for OCR
             prompt = (
                 "This is a navigation arc image from a webcomic showing page numbers. "
                 "It contains text like 'Page 1 of X' or similar pagination information. "
@@ -111,29 +108,26 @@ class OllamaVisionClient:
                 "Respond with ONLY the number, nothing else."
             )
 
-            # Use vision model to OCR the image
-            response = self.client.generate(
-                model=self.model,
+            response = self.processor.analyze_image(
+                image_data=encoded_image,
                 prompt=prompt,
-                temperature=VISION_TEMPERATURE,
-                images=[encoded_image]
+                temperature=VISION_TEMPERATURE
             )
 
             if not response:
                 logger.error("No response from vision model")
                 return 1
 
-            # Extract number from response
             logger.debug(f"Vision model response: {response}")
             numbers = re.findall(r'\d+', response)
 
             if numbers:
-                page_count = int(numbers[-1])  # Take the last number (usually "X of Y")
+                page_count = int(numbers[-1])
                 logger.info(f"Detected {page_count} pages in Oglaf comic")
                 return page_count
-            else:
-                logger.warning("Could not extract page count, defaulting to 1")
-                return 1
+
+            logger.warning("Could not extract page count, defaulting to 1")
+            return 1
 
         except Exception as e:
             logger.error(f"Error detecting Oglaf pages: {e}")
@@ -160,17 +154,14 @@ class OllamaVisionClient:
         }
 
         try:
-            # Check if file exists and is readable
             with Image.open(image_path) as img:
                 result['format'] = img.format
                 result['size'] = img.size
 
-                # Check format
                 if img.format not in ALLOWED_IMAGE_FORMATS:
                     result['reason'] = f"Invalid format: {img.format}"
                     return result
 
-                # Check minimum size
                 width, height = img.size
                 if width < MIN_IMAGE_SIZE or height < MIN_IMAGE_SIZE:
                     result['reason'] = f"Image too small: {width}x{height}"
@@ -178,8 +169,7 @@ class OllamaVisionClient:
 
                 result['valid'] = True
 
-                # Optional: Use vision model to verify it's actually a comic
-                # This is expensive, so only use if explicitly requested
+                # Use vision model to verify it's a comic
                 encoded_image = self.encode_image_from_file(image_path)
                 if encoded_image:
                     prompt = (
@@ -187,11 +177,10 @@ class OllamaVisionClient:
                         "Answer with only 'yes' or 'no'."
                     )
 
-                    response = self.client.generate(
-                        model=self.model,
+                    response = self.processor.analyze_image(
+                        image_data=encoded_image,
                         prompt=prompt,
-                        temperature=VISION_TEMPERATURE,
-                        images=[encoded_image]
+                        temperature=VISION_TEMPERATURE
                     )
 
                     if response and 'yes' in response.lower():
@@ -223,11 +212,10 @@ class OllamaVisionClient:
 
             prompt = "Describe this image in detail."
 
-            response = self.client.generate(
-                model=self.model,
+            response = self.processor.analyze_image(
+                image_data=encoded_image,
                 prompt=prompt,
-                temperature=VISION_TEMPERATURE,
-                images=[encoded_image]
+                temperature=VISION_TEMPERATURE
             )
 
             return response

@@ -2,15 +2,14 @@
 """
 Test script for OpenAI provider integration.
 
-This script tests the OpenAI provider's text and vision capabilities
-without running the full RSS processor.
+Uses the factory pattern to create AI client with OpenAI provider.
 
 Usage:
     # Test text summarization
     python scripts/test_openai_provider.py --test text
 
     # Test vision processing
-    python scripts/test_openai_provider.py --test vision
+    python scripts/test_openai_provider.py --test vision --image path/to/image.png
 
     # Test health check
     python scripts/test_openai_provider.py --test health
@@ -30,114 +29,101 @@ import os
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.openai_provider import OpenAIClient, OpenAITextProcessor, OpenAIVisionProcessor
+import src.config as config_module
+config_module.AI_PROVIDER = 'openai'
+
+from src.ai_client import create_ai_client_with_fallback
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 
 
-def test_health_check():
+def test_health_check(ai_client):
     """Test OpenAI API health check."""
     print("\n" + "="*60)
     print("Testing OpenAI API Health Check")
     print("="*60)
 
     try:
-        client = OpenAIClient()
-        is_healthy = client.health_check()
-
+        is_healthy = ai_client.health_check()
         if is_healthy:
-            print("✓ OpenAI API is accessible")
+            print("PASS: OpenAI API is accessible")
             return True
         else:
-            print("✗ OpenAI API is not accessible")
+            print("FAIL: OpenAI API is not accessible")
             return False
-
-    except ValueError as e:
-        print(f"✗ Error: {e}")
+    except Exception as e:
+        print(f"FAIL: {e}")
         return False
 
 
-def test_list_models():
+def test_list_models(ai_client):
     """Test listing OpenAI models."""
     print("\n" + "="*60)
     print("Testing Model Listing")
     print("="*60)
 
     try:
-        client = OpenAIClient()
-        models = client.list_models()
-
+        models = ai_client.list_models()
         if models:
-            print(f"✓ Retrieved {len(models)} models")
-            print("\nSome available models:")
-            # Show GPT models only
+            print(f"PASS: Retrieved {len(models)} models")
             gpt_models = [m for m in models if 'gpt' in m.lower()][:10]
-            for model in gpt_models:
-                print(f"  - {model}")
+            if gpt_models:
+                print("\nSome available GPT models:")
+                for model in gpt_models:
+                    print(f"  - {model}")
             return True
         else:
-            print("✗ No models retrieved")
+            print("FAIL: No models retrieved")
             return False
-
-    except ValueError as e:
-        print(f"✗ Error: {e}")
+    except Exception as e:
+        print(f"FAIL: {e}")
         return False
 
 
-def test_text_summarization():
+def test_text_summarization(text_processor):
     """Test text summarization."""
     print("\n" + "="*60)
     print("Testing Text Summarization")
     print("="*60)
 
-    # Sample article text
-    article = {
-        'text': """
-        Artificial intelligence has made remarkable progress in recent years,
-        particularly in the field of natural language processing. Large language
-        models like GPT-4 can now understand and generate human-like text with
-        unprecedented accuracy. These models are being used in various applications,
-        from chatbots to content creation, translation, and code generation.
-        However, challenges remain in areas such as reasoning, factual accuracy,
-        and avoiding biases present in training data.
-        """,
-        'title': 'Advances in AI Language Models',
-        'author': 'Tech Reporter',
-        'url': 'https://example.com/ai-article'
-    }
+    sample_text = (
+        "Artificial intelligence has made remarkable progress in recent years, "
+        "particularly in the field of natural language processing. Large language "
+        "models like GPT-4 can now understand and generate human-like text with "
+        "unprecedented accuracy. These models are being used in various applications, "
+        "from chatbots to content creation, translation, and code generation. "
+        "However, challenges remain in areas such as reasoning, factual accuracy, "
+        "and avoiding biases present in training data."
+    )
 
     try:
-        processor = OpenAITextProcessor(model="gpt-4o-mini")
-        print(f"Using model: gpt-4o-mini")
-
-        print("\nSummarizing article...")
-        result = processor.summarize_article(article)
+        result = text_processor.generate_summary(
+            text=sample_text,
+            title="Advances in AI Language Models",
+            author="Tech Reporter"
+        )
 
         if result:
-            print("\n✓ Summary generated successfully:")
-            print(f"\nGenerated Title: {result['title']}")
-            print(f"\nSummary:\n{result['summary']}")
-            print(f"\nClickbait detected: {result['is_clickbait']}")
-            if result['clickbait_detected_by']:
-                print(f"Detection method: {result['clickbait_detected_by']}")
+            print(f"PASS: Generated Title: {result.get('title', 'N/A')}")
+            print(f"PASS: Generated Summary: {result.get('summary', 'N/A')[:200]}...")
+            print(f"Clickbait: {result.get('is_clickbait', False)}")
+            print(f"Ad: {result.get('is_ad', False)}")
             return True
         else:
-            print("✗ Failed to generate summary")
+            print("FAIL: Failed to generate summary")
             return False
-
-    except ValueError as e:
-        print(f"✗ Error: {e}")
+    except Exception as e:
+        print(f"FAIL: {e}")
         return False
 
 
-def test_clickbait_detection():
+def test_clickbait_detection(text_processor):
     """Test clickbait detection."""
     print("\n" + "="*60)
     print("Testing Clickbait Detection")
     print("="*60)
 
-    # Test cases
     test_cases = [
         {
             'title': "You Won't Believe What This AI Can Do!",
@@ -152,66 +138,66 @@ def test_clickbait_detection():
     ]
 
     try:
-        processor = OpenAITextProcessor(model="gpt-4o-mini")
-
         results = []
         for i, case in enumerate(test_cases, 1):
             print(f"\nTest {i}: {case['title']}")
-            is_clickbait = processor.detect_clickbait(case['title'], case['text'])
+            is_clickbait = text_processor.detect_clickbait(case['title'], case['text'])
             print(f"  Detected as clickbait: {is_clickbait}")
             print(f"  Expected: {case['expected']}")
 
             if is_clickbait == case['expected']:
-                print("  ✓ Correct")
+                print("  PASS")
                 results.append(True)
             else:
-                print("  ⚠ Unexpected result")
+                print("  WARN: Unexpected result")
                 results.append(False)
 
         success_rate = sum(results) / len(results) * 100
         print(f"\nSuccess rate: {success_rate:.0f}%")
-        return success_rate >= 50  # At least 50% correct
-
-    except ValueError as e:
-        print(f"✗ Error: {e}")
+        return success_rate >= 50
+    except Exception as e:
+        print(f"FAIL: {e}")
         return False
 
 
-def test_vision_processing(image_path=None):
+def test_vision_processing(vision_processor, image_path=None):
     """Test vision processing."""
     print("\n" + "="*60)
     print("Testing Vision Processing")
     print("="*60)
 
+    if not vision_processor:
+        print("SKIP: No vision processor available")
+        return None
+
     if not image_path:
-        print("⚠ No image path provided, skipping vision test")
-        print("  Use --image flag to provide an image path")
+        print("SKIP: No image path provided (use --image flag)")
         return None
 
     if not os.path.exists(image_path):
-        print(f"✗ Image not found: {image_path}")
+        print(f"FAIL: Image not found: {image_path}")
         return False
 
     try:
-        processor = OpenAIVisionProcessor(model="gpt-4o")
-        print(f"Using model: gpt-4o")
-        print(f"Analyzing image: {image_path}")
+        encoded = vision_processor.encode_image_from_file(image_path)
+        if not encoded:
+            print("FAIL: Failed to encode image")
+            return False
 
-        result = processor.analyze_image(
-            image_path,
-            "Describe this image in detail."
+        result = vision_processor.processor.analyze_image(
+            image_data=encoded,
+            prompt="Describe this image in detail."
         )
 
         if result:
-            print("\n✓ Vision analysis successful:")
+            print(f"\nPASS: Vision analysis successful:")
             print(f"\n{result}")
             return True
         else:
-            print("✗ Failed to analyze image")
+            print("FAIL: No response from vision model")
             return False
-
-    except ValueError as e:
-        print(f"✗ Error: {e}")
+    except Exception as e:
+        print(f"FAIL: {e}")
         return False
 
 
@@ -231,7 +217,6 @@ def main():
         '--image',
         help='Path to image file for vision testing'
     )
-
     args = parser.parse_args()
 
     # Check for API key
@@ -244,22 +229,30 @@ def main():
         print("\nGet your API key from: https://platform.openai.com/api-keys")
         return 1
 
+    # Create client via factory
+    print("\nCreating OpenAI AI client...")
+    try:
+        ai_client, text_processor, vision_processor = create_ai_client_with_fallback()
+    except Exception as e:
+        print(f"ERROR: Failed to create AI client: {e}")
+        return 1
+
     results = {}
 
     if args.test in ['health', 'all']:
-        results['health'] = test_health_check()
+        results['health'] = test_health_check(ai_client)
 
     if args.test in ['models', 'all']:
-        results['models'] = test_list_models()
+        results['models'] = test_list_models(ai_client)
 
     if args.test in ['text', 'all']:
-        results['text'] = test_text_summarization()
+        results['text'] = test_text_summarization(text_processor)
 
     if args.test in ['clickbait', 'all']:
-        results['clickbait'] = test_clickbait_detection()
+        results['clickbait'] = test_clickbait_detection(text_processor)
 
     if args.test in ['vision', 'all']:
-        results['vision'] = test_vision_processing(args.image)
+        results['vision'] = test_vision_processing(vision_processor, args.image)
 
     # Print summary
     print("\n" + "="*60)
@@ -269,21 +262,15 @@ def main():
     for test_name, result in results.items():
         if result is None:
             status = "SKIPPED"
-            symbol = "⊘"
         elif result:
             status = "PASSED"
-            symbol = "✓"
         else:
             status = "FAILED"
-            symbol = "✗"
+        print(f"  {test_name.capitalize()}: {status}")
 
-        print(f"{symbol} {test_name.capitalize()}: {status}")
-
-    # Overall result
     passed = sum(1 for r in results.values() if r is True)
     failed = sum(1 for r in results.values() if r is False)
     skipped = sum(1 for r in results.values() if r is None)
-
     print(f"\nTotal: {passed} passed, {failed} failed, {skipped} skipped")
 
     return 0 if failed == 0 else 1

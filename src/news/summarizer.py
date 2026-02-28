@@ -3,7 +3,6 @@ News article summarizer using AI (Ollama, LM Studio, etc.)
 """
 from .article_extractor import ArticleExtractor
 from .content_cleaner import ContentCleaner
-from ..ai_client.base import BaseTextProcessor
 from ..feed_processor.feed_language_detector import FeedLanguageDetector
 from ..utils.logging_config import get_logger
 
@@ -122,6 +121,7 @@ class NewsSummarizer:
                 'date': article_data.get('date'),
                 'is_clickbait': summary_data.get('is_clickbait', False),
                 'clickbait_detected_by': summary_data.get('clickbait_detected_by'),
+                'is_ad': summary_data.get('is_ad', False),
                 'word_count': validation['word_count'],
                 'source': article_data.get('source', 'extracted'),
                 'language': language  # Store detected language for debugging

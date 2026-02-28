@@ -229,6 +229,24 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             margin-left: 10px;
         }}
 
+        .article.ad {{
+            background-color: #fde8e8;
+            padding: 15px;
+            border-radius: 6px;
+            border-left: 4px solid #dc3545;
+        }}
+
+        .ad-badge {{
+            display: inline-block;
+            background-color: #dc3545;
+            color: #fff;
+            padding: 3px 8px;
+            border-radius: 3px;
+            font-size: 0.8em;
+            font-weight: 600;
+            margin-left: 10px;
+        }}
+
         .error {{
             background-color: #f8d7da;
             border: 1px solid #f5c6cb;
@@ -357,6 +375,17 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             .clickbait-badge {{
                 background-color: #d4a017;
                 color: #1a1a1a;
+            }}
+
+            /* Ad/sponsored styling for dark mode */
+            .article.ad {{
+                background-color: #3d1f1f;
+                border-left: 4px solid #c0392b;
+            }}
+
+            .ad-badge {{
+                background-color: #c0392b;
+                color: #f5f5f5;
             }}
 
             /* Error styling for dark mode */

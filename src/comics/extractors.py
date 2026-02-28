@@ -6,7 +6,6 @@ from bs4 import BeautifulSoup
 from .base_extractor import ComicExtractor
 from ..utils.logging_config import get_logger
 from ..utils.http_client import fetch_url
-from ..ollama_client.vision_processor import OllamaVisionClient
 
 logger = get_logger(__name__)
 
@@ -96,7 +95,7 @@ class OglafExtractor(ComicExtractor):
     Oglaf extractor - handles multi-page comics using vision model.
     """
 
-    def __init__(self, feed_data, session=None, use_vision=True):
+    def __init__(self, feed_data, session=None, use_vision=True, vision_processor=None):
         """
         Initialize Oglaf extractor.
 
@@ -104,10 +103,11 @@ class OglafExtractor(ComicExtractor):
             feed_data: Feed data dict
             session: HTTP session
             use_vision: Whether to use vision model for page detection
+            vision_processor: DomainVisionProcessor instance (optional)
         """
         super().__init__(feed_data, session)
         self.use_vision = use_vision
-        self.vision_client = OllamaVisionClient() if use_vision else None
+        self.vision_processor = vision_processor
 
     def extract_image_urls(self):
         """Extract Oglaf comic images. Pattern: media.oglaf.com/comic/NAME.jpg (tt prefix = title card)"""
@@ -390,7 +390,7 @@ class IncaseExtractor(ComicExtractor):
             return []
 
 
-def get_extractor(feed_data, session=None, use_vision=True):
+def get_extractor(feed_data, session=None, use_vision=True, vision_processor=None):
     """
     Factory function to get appropriate extractor for a feed.
 
@@ -398,15 +398,18 @@ def get_extractor(feed_data, session=None, use_vision=True):
         feed_data: Feed data dict with 'special_handler' field
         session: HTTP session
         use_vision: Whether to use vision model for Oglaf
+        vision_processor: DomainVisionProcessor instance (optional)
 
     Returns:
         ComicExtractor instance
     """
     special_handler = feed_data.get('special_handler')
 
+    if special_handler == 'oglaf':
+        return OglafExtractor(feed_data, session, use_vision=use_vision, vision_processor=vision_processor)
+
     extractors = {
         'penny_arcade': PennyArcadeExtractor,
-        'oglaf': lambda fd, s: OglafExtractor(fd, s, use_vision=use_vision),
         'widdershins': WiddershinsExtractor,
         'gunnerkrigg': GunnerkriggExtractor,
         'savestate': SavestateExtractor,
@@ -416,11 +419,7 @@ def get_extractor(feed_data, session=None, use_vision=True):
     }
 
     if special_handler in extractors:
-        extractor_class = extractors[special_handler]
-        if callable(extractor_class) and special_handler == 'oglaf':
-            return extractor_class(feed_data, session)
-        else:
-            return extractor_class(feed_data, session)
+        return extractors[special_handler](feed_data, session)
 
     # Default extractor
     return DefaultExtractor(feed_data, session)

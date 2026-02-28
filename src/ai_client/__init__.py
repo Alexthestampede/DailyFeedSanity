@@ -1,17 +1,17 @@
 """
 AI Client Abstraction Layer
 
-This module provides an abstraction layer for different AI providers,
-allowing the application to switch between Ollama, LM Studio, and other
-providers without changing the rest of the codebase.
+Uses ModuLLe (vendored in lib/modulle/) for generic AI provider support,
+wrapped with domain-specific processors for DailyFeedSanity.
 """
 
-from .base import BaseAIClient, BaseTextProcessor
 from .factory import create_ai_client, create_ai_client_with_fallback
+from .domain_text_processor import DomainTextProcessor
+from .domain_vision_processor import DomainVisionProcessor
 
 __all__ = [
-    'BaseAIClient',
-    'BaseTextProcessor',
+    'DomainTextProcessor',
+    'DomainVisionProcessor',
     'create_ai_client',
     'create_ai_client_with_fallback',
 ]

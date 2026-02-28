@@ -52,6 +52,7 @@ FEED_TYPE_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent feed cla
 CLICKBAIT_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent clickbait detection
 LANGUAGE_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent language detection (per-article, deprecated)
 FEED_LANGUAGE_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent feed language detection
+AD_DETECTION_TEMPERATURE = 0.1  # Low temperature for consistent ad/sponsored content detection
 
 # Feed Classification
 # Comics are processed by downloading images

@@ -4,6 +4,7 @@ Interactive setup tool for first-run configuration and ongoing management.
 """
 import json
 import os
+import subprocess
 import sys
 import urllib.request
 import urllib.error
@@ -1028,6 +1029,136 @@ def display_config_summary(config: Dict):
     print()
 
 
+def check_for_updates():
+    """
+    Check for updates by comparing local and remote git repositories.
+    Offers to pull updates if behind the remote master branch.
+    """
+    print_section("Check for Updates")
+
+    # Step 1: Verify we're in a git repository
+    try:
+        result = subprocess.run(
+            ['git', 'rev-parse', '--is-inside-work-tree'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode != 0:
+            print("This directory is not a git repository.")
+            print("Updates can only be checked in a git-managed installation.")
+            return
+    except FileNotFoundError:
+        print("Git is not installed or not found in PATH.")
+        print("Please install git to use the update feature.")
+        return
+    except subprocess.TimeoutExpired:
+        print("Git command timed out.")
+        return
+
+    # Step 2: Fetch latest changes from remote
+    print("Fetching latest changes from remote...")
+    try:
+        result = subprocess.run(
+            ['git', 'fetch', 'origin'],
+            capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            if 'Could not resolve host' in stderr or 'unable to access' in stderr:
+                print("No network connection available. Cannot check for updates.")
+            elif 'No such remote' in stderr or "doesn't have any remote" in stderr:
+                print("No remote 'origin' configured for this repository.")
+                print("Updates cannot be checked without a remote.")
+            else:
+                print(f"Failed to fetch from remote: {stderr}")
+            return
+    except subprocess.TimeoutExpired:
+        print("Network request timed out. Check your internet connection.")
+        return
+
+    # Step 3: Check how many commits we are behind
+    try:
+        result = subprocess.run(
+            ['git', 'rev-list', '--count', 'HEAD..origin/master'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode != 0:
+            stderr = result.stderr.strip()
+            if 'unknown revision' in stderr:
+                print("Remote branch 'origin/master' not found.")
+                print("The remote repository may use a different branch name.")
+            else:
+                print(f"Failed to check for updates: {stderr}")
+            return
+
+        behind_count = int(result.stdout.strip())
+    except subprocess.TimeoutExpired:
+        print("Git command timed out.")
+        return
+    except ValueError:
+        print("Could not determine update status.")
+        return
+
+    # Step 4: Report status
+    if behind_count == 0:
+        print("You are up to date! No new updates available.")
+        return
+
+    print(f"You are {behind_count} commit(s) behind origin/master.\n")
+
+    # Show recent commit messages
+    try:
+        result = subprocess.run(
+            ['git', 'log', '--oneline', 'HEAD..origin/master'],
+            capture_output=True, text=True, timeout=5
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            print("New changes:")
+            for line in result.stdout.strip().split('\n'):
+                print(f"  {line}")
+            print()
+    except (subprocess.TimeoutExpired, Exception):
+        pass  # Non-critical, continue even if log fails
+
+    # Step 5: Offer to pull
+    if not get_yes_no("Do you want to update now?", default=True):
+        print("\nUpdate skipped. You can update later from this menu.")
+        return
+
+    print("\nPulling updates...")
+    try:
+        result = subprocess.run(
+            ['git', 'pull', 'origin', 'master'],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0:
+            print("Update successful!")
+            if result.stdout.strip():
+                print(result.stdout.strip())
+        else:
+            stderr = result.stderr.strip()
+            stdout = result.stdout.strip()
+            if 'CONFLICT' in stdout or 'CONFLICT' in stderr:
+                print("Update failed due to merge conflicts.")
+                print("You have local changes that conflict with the update.")
+                print("\nTo resolve manually:")
+                print("  1. Run: git status  (to see conflicted files)")
+                print("  2. Edit the conflicted files to resolve conflicts")
+                print("  3. Run: git add <resolved files>")
+                print("  4. Run: git commit")
+                print("\nOr to discard local changes and force update:")
+                print("  git reset --hard origin/master")
+            elif 'uncommitted changes' in stderr or 'local changes' in stderr:
+                print("Update failed: you have uncommitted local changes.")
+                print("Please commit or stash your changes first:")
+                print("  git stash        (to temporarily save changes)")
+                print("  git pull origin master")
+                print("  git stash pop    (to restore your changes)")
+            else:
+                print(f"Update failed: {stderr or stdout}")
+    except subprocess.TimeoutExpired:
+        print("Update timed out. Please try again or run 'git pull origin master' manually.")
+
+
 def interactive_menu(config: Dict):
     """
     Display interactive menu for managing configuration.
@@ -1052,10 +1183,11 @@ def interactive_menu(config: Dict):
         print(" [10] Add language override")
         print(" [11] Remove language override")
         print(" [12] Clear language cache")
-        print(" [13] Exit")
+        print(" [13] Check for updates")
+        print(" [14] Exit")
         print()
 
-        choice = input("Select option [1-13]: ").strip()
+        choice = input("Select option [1-14]: ").strip()
 
         if choice == '1':
             # Change AI provider (requires full reconfiguration)
@@ -1188,12 +1320,17 @@ def interactive_menu(config: Dict):
             input("Press Enter to continue...")
 
         elif choice == '13':
+            # Check for updates
+            check_for_updates()
+            input("Press Enter to continue...")
+
+        elif choice == '14':
             # Exit
             print("\nExiting configuration wizard.")
             break
 
         else:
-            print("\nInvalid option. Please select 1-13.")
+            print("\nInvalid option. Please select 1-14.")
             input("Press Enter to continue...")
 
 

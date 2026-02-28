@@ -16,20 +16,23 @@ class FeedClassifier:
     Uses AI (Ollama, LM Studio, etc.) for automatic detection of unknown feeds.
     """
 
-    def __init__(self, use_ai_detection=True, ai_client=None):
+    def __init__(self, use_ai_detection=True, ai_client=None, text_processor=None):
         """
         Initialize feed classifier.
 
         Args:
             use_ai_detection: Whether to use AI for unknown feeds (default: True)
-            ai_client: BaseAIClient instance to use (optional, will be created if needed)
+            ai_client: BaseAIClient instance (for health_check, optional)
+            text_processor: Text processor with generate() method (optional)
         """
         self.use_ai_detection = use_ai_detection
         self.feed_detector = None
 
         if use_ai_detection:
-            # Pass ai_client to FeedTypeDetector if provided
-            self.feed_detector = FeedTypeDetector(ai_client=ai_client)
+            self.feed_detector = FeedTypeDetector(
+                text_processor=text_processor,
+                ai_client=ai_client
+            )
 
         self.manual_overrides = self._load_manual_overrides()
 
