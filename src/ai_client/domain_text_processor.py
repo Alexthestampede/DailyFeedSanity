@@ -220,14 +220,9 @@ class DomainTextProcessor:
         is_ad = False
         if title and self.enable_ad_detection:
             try:
-                logger.info(
-                    f"Running ad detection (enabled={self.enable_ad_detection})"
-                )
                 is_ad = self.detect_ad(title, text)
             except Exception as e:
                 logger.warning(f"AI ad detection failed: {e}")
-        elif title:
-            logger.info(f"Skipping ad detection (enabled={self.enable_ad_detection})")
 
         logger.info(f"Generating summary in {language}")
 
