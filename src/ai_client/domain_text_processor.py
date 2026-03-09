@@ -221,7 +221,7 @@ class DomainTextProcessor:
 
         # Ad detection
         is_ad = False
-        if title and ENABLE_AD_DETECTION:
+        if title and self.enable_ad_detection:
             try:
                 is_ad = self.detect_ad(title, text)
             except Exception as e:

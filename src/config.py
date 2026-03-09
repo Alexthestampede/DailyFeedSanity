@@ -10,7 +10,7 @@ AI_PROVIDER = "ollama"  # Default to Ollama for backward compatibility
 
 # Feature Toggles
 ENABLE_AD_DETECTION = (
-    True  # Enable AI-based ad/sponsored content detection (can be overly sensitive)
+    False  # Enable AI-based ad/sponsored content detection (can be overly sensitive)
 )
 
 # Ollama Configuration
