@@ -2,6 +2,7 @@
 Configuration Wizard for RSS Feed Processor
 Interactive setup tool for first-run configuration and ongoing management.
 """
+
 import json
 import os
 import subprocess
@@ -19,56 +20,58 @@ except ImportError:
 
 
 # Configuration file path
-CONFIG_FILE = Path(__file__).parent.parent.parent / '.config.json'
-RSS_FILE = Path(__file__).parent.parent.parent / 'rss.txt'
-LANGUAGE_OVERRIDE_FILE = Path(__file__).parent.parent.parent / 'feed_language_overrides.txt'
-LANGUAGE_CACHE_FILE = Path(__file__).parent.parent.parent / '.feed_language_cache.json'
+CONFIG_FILE = Path(__file__).parent.parent.parent / ".config.json"
+RSS_FILE = Path(__file__).parent.parent.parent / "rss.txt"
+LANGUAGE_OVERRIDE_FILE = (
+    Path(__file__).parent.parent.parent / "feed_language_overrides.txt"
+)
+LANGUAGE_CACHE_FILE = Path(__file__).parent.parent.parent / ".feed_language_cache.json"
 
 
 # AI Provider Information
 AI_PROVIDERS = {
-    'ollama': {
-        'name': 'Ollama',
-        'type': 'local',
-        'cost': 'Free',
-        'requires_api_key': False,
-        'description': 'Run AI models locally on your machine',
-        'setup_url': 'https://ollama.com/download',
+    "ollama": {
+        "name": "Ollama",
+        "type": "local",
+        "cost": "Free",
+        "requires_api_key": False,
+        "description": "Run AI models locally on your machine",
+        "setup_url": "https://ollama.com/download",
     },
-    'lm_studio': {
-        'name': 'LM Studio',
-        'type': 'local',
-        'cost': 'Free',
-        'requires_api_key': False,
-        'description': 'Run AI models locally with a GUI interface',
-        'setup_url': 'https://lmstudio.ai/',
+    "lm_studio": {
+        "name": "LM Studio",
+        "type": "local",
+        "cost": "Free",
+        "requires_api_key": False,
+        "description": "Run AI models locally with a GUI interface",
+        "setup_url": "https://lmstudio.ai/",
     },
-    'openai': {
-        'name': 'OpenAI',
-        'type': 'cloud',
-        'cost': 'Paid (GPT-4o-mini: ~$0.15/1M input tokens)',
-        'requires_api_key': True,
-        'description': 'Cloud-based AI service from OpenAI',
-        'setup_url': 'https://platform.openai.com/api-keys',
-        'warning': 'Using OpenAI API will incur costs charged to your account. You are responsible for all token usage charges.',
+    "openai": {
+        "name": "OpenAI",
+        "type": "cloud",
+        "cost": "Paid (GPT-4o-mini: ~$0.15/1M input tokens)",
+        "requires_api_key": True,
+        "description": "Cloud-based AI service from OpenAI",
+        "setup_url": "https://platform.openai.com/api-keys",
+        "warning": "Using OpenAI API will incur costs charged to your account. You are responsible for all token usage charges.",
     },
-    'gemini': {
-        'name': 'Google Gemini',
-        'type': 'cloud',
-        'cost': 'Free tier available, then paid',
-        'requires_api_key': True,
-        'description': 'Google\'s AI service with generous free tier',
-        'setup_url': 'https://aistudio.google.com/app/apikey',
-        'warning': 'Gemini has a free tier, but exceeding limits will incur costs at your risk.',
+    "gemini": {
+        "name": "Google Gemini",
+        "type": "cloud",
+        "cost": "Free tier available, then paid",
+        "requires_api_key": True,
+        "description": "Google's AI service with generous free tier",
+        "setup_url": "https://aistudio.google.com/app/apikey",
+        "warning": "Gemini has a free tier, but exceeding limits will incur costs at your risk.",
     },
-    'claude': {
-        'name': 'Anthropic Claude',
-        'type': 'cloud',
-        'cost': 'Paid (Claude 3.5 Haiku: ~$0.80/1M input tokens)',
-        'requires_api_key': True,
-        'description': 'Anthropic\'s Claude AI service',
-        'setup_url': 'https://console.anthropic.com/',
-        'warning': 'Using Claude API will incur costs charged to your account. You are responsible for all token usage charges.',
+    "claude": {
+        "name": "Anthropic Claude",
+        "type": "cloud",
+        "cost": "Paid (Claude 3.5 Haiku: ~$0.80/1M input tokens)",
+        "requires_api_key": True,
+        "description": "Anthropic's Claude AI service",
+        "setup_url": "https://console.anthropic.com/",
+        "warning": "Using Claude API will incur costs charged to your account. You are responsible for all token usage charges.",
     },
 }
 
@@ -84,7 +87,7 @@ def load_config() -> Optional[Dict]:
         return None
 
     try:
-        with open(CONFIG_FILE, 'r') as f:
+        with open(CONFIG_FILE, "r") as f:
             return json.load(f)
     except (json.JSONDecodeError, IOError) as e:
         print(f"Error loading configuration: {e}")
@@ -102,7 +105,7 @@ def save_config(config: Dict) -> bool:
         True if successful, False otherwise
     """
     try:
-        with open(CONFIG_FILE, 'w') as f:
+        with open(CONFIG_FILE, "w") as f:
             json.dump(config, f, indent=2)
         return True
     except IOError as e:
@@ -122,12 +125,12 @@ def should_run_first_setup() -> bool:
         return True
 
     # Check if first run was completed
-    return not config.get('first_run_complete', False)
+    return not config.get("first_run_complete", False)
 
 
 def clear_screen():
     """Clear the terminal screen."""
-    os.system('clear' if os.name != 'nt' else 'cls')
+    os.system("clear" if os.name != "nt" else "cls")
 
 
 def print_header(title: str):
@@ -178,7 +181,7 @@ def get_yes_no(prompt: str, default: bool = True) -> bool:
     if not response:
         return default
 
-    return response in ['y', 'yes']
+    return response in ["y", "yes"]
 
 
 def validate_url(url: str) -> bool:
@@ -193,6 +196,7 @@ def validate_url(url: str) -> bool:
     """
     try:
         from urllib.parse import urlparse
+
         result = urlparse(url)
         return all([result.scheme, result.netloc])
     except Exception:
@@ -232,9 +236,9 @@ def test_lm_studio_connection(server_url: str) -> bool:
         req = urllib.request.Request(url)
 
         with urllib.request.urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode('utf-8'))
+            data = json.loads(response.read().decode("utf-8"))
             # Check if response has 'data' field (OpenAI format)
-            return 'data' in data
+            return "data" in data
 
     except Exception as e:
         print(f"Connection failed: {e}")
@@ -256,8 +260,8 @@ def get_lm_studio_models(server_url: str) -> List[Dict]:
         req = urllib.request.Request(url)
 
         with urllib.request.urlopen(req, timeout=10) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            return data.get('data', [])
+            data = json.loads(response.read().decode("utf-8"))
+            return data.get("data", [])
 
     except Exception as e:
         print(f"Failed to get models: {e}")
@@ -274,7 +278,9 @@ def display_model_info(model: ModelCapabilities, index: int):
     # Warning if context is low
     context = model.actual_context or model.context_window or 0
     if context > 0 and context < 4096:
-        print(f"      WARNING: Context size ({context}) is below recommended minimum (4096)")
+        print(
+            f"      WARNING: Context size ({context}) is below recommended minimum (4096)"
+        )
     print()
 
 
@@ -292,7 +298,7 @@ def select_ollama_model(inspector: OllamaInspector, model_type: str) -> Optional
     print_section(f"Select {model_type.title()} Model")
 
     # Get appropriate models
-    if model_type == 'vision':
+    if model_type == "vision":
         models = inspector.get_vision_models(min_context=0)  # Show all vision models
         if not models:
             print("No vision-capable models found on server.")
@@ -311,9 +317,11 @@ def select_ollama_model(inspector: OllamaInspector, model_type: str) -> Optional
 
     # Get selection
     while True:
-        if model_type == 'vision':
-            response = input(f"Select model [1-{len(models)}, or 's' to skip]: ").strip()
-            if response.lower() == 's':
+        if model_type == "vision":
+            response = input(
+                f"Select model [1-{len(models)}, or 's' to skip]: "
+            ).strip()
+            if response.lower() == "s":
                 return None
         else:
             response = input(f"Select model [1-{len(models)}]: ").strip()
@@ -326,17 +334,25 @@ def select_ollama_model(inspector: OllamaInspector, model_type: str) -> Optional
                 # Warn about low context
                 context = selected.actual_context or selected.context_window or 0
                 if context > 0 and context < 4096:
-                    print(f"\nWARNING: This model has a context size of {context}, which is below")
-                    print("the recommended minimum of 4096. It may not work well for long articles.")
-                    if not get_yes_no("Continue with this model anyway?", default=False):
+                    print(
+                        f"\nWARNING: This model has a context size of {context}, which is below"
+                    )
+                    print(
+                        "the recommended minimum of 4096. It may not work well for long articles."
+                    )
+                    if not get_yes_no(
+                        "Continue with this model anyway?", default=False
+                    ):
                         continue
 
                 return selected.name
             else:
                 print(f"Please enter a number between 1 and {len(models)}")
         except ValueError:
-            if model_type == 'vision':
-                print(f"Please enter a number between 1 and {len(models)}, or 's' to skip")
+            if model_type == "vision":
+                print(
+                    f"Please enter a number between 1 and {len(models)}, or 's' to skip"
+                )
             else:
                 print(f"Please enter a number between 1 and {len(models)}")
 
@@ -363,7 +379,7 @@ def select_lm_studio_model(server_url: str) -> Optional[str]:
     # Display models
     print("Available models:\n")
     for i, model in enumerate(models, 1):
-        model_id = model.get('id', 'unknown')
+        model_id = model.get("id", "unknown")
         print(f"  [{i}] {model_id}")
     print()
 
@@ -374,7 +390,7 @@ def select_lm_studio_model(server_url: str) -> Optional[str]:
         try:
             index = int(response) - 1
             if 0 <= index < len(models):
-                return models[index].get('id')
+                return models[index].get("id")
             else:
                 print(f"Please enter a number between 1 and {len(models)}")
         except ValueError:
@@ -399,7 +415,9 @@ def configure_ollama() -> Optional[Dict]:
     if not test_ollama_connection(server_url):
         print("\nFailed to connect to Ollama server.")
         print(f"Please ensure Ollama is running at {server_url}")
-        print(f"Visit {AI_PROVIDERS['ollama']['setup_url']} for installation instructions.")
+        print(
+            f"Visit {AI_PROVIDERS['ollama']['setup_url']} for installation instructions."
+        )
         return None
 
     print("Connection successful!")
@@ -408,22 +426,22 @@ def configure_ollama() -> Optional[Dict]:
     inspector = OllamaInspector(server_url)
 
     # Select text model
-    text_model = select_ollama_model(inspector, 'text')
+    text_model = select_ollama_model(inspector, "text")
     if not text_model:
         print("Text model is required. Setup cancelled.")
         return None
 
     # Select vision model (optional)
     if get_yes_no("\nDo you want to configure a vision model?", default=False):
-        vision_model = select_ollama_model(inspector, 'vision')
+        vision_model = select_ollama_model(inspector, "vision")
     else:
         vision_model = None
 
     return {
-        'ai_provider': 'ollama',
-        'ollama_base_url': server_url,
-        'text_model': text_model,
-        'vision_model': vision_model,
+        "ai_provider": "ollama",
+        "ollama_base_url": server_url,
+        "text_model": text_model,
+        "vision_model": vision_model,
     }
 
 
@@ -445,7 +463,9 @@ def configure_lm_studio() -> Optional[Dict]:
     if not test_lm_studio_connection(server_url):
         print("\nFailed to connect to LM Studio server.")
         print(f"Please ensure LM Studio is running with a model loaded at {server_url}")
-        print(f"Visit {AI_PROVIDERS['lm_studio']['setup_url']} for installation instructions.")
+        print(
+            f"Visit {AI_PROVIDERS['lm_studio']['setup_url']} for installation instructions."
+        )
         return None
 
     print("Connection successful!")
@@ -456,14 +476,16 @@ def configure_lm_studio() -> Optional[Dict]:
         print("Model selection is required. Setup cancelled.")
         return None
 
-    print(f"\nNote: LM Studio will use the same model ({model}) for both text and vision tasks.")
+    print(
+        f"\nNote: LM Studio will use the same model ({model}) for both text and vision tasks."
+    )
     print("Make sure your model supports vision if you plan to use image validation.")
 
     return {
-        'ai_provider': 'lm_studio',
-        'lm_studio_base_url': server_url,
-        'text_model': model,
-        'vision_model': model,  # LM Studio uses same model for both
+        "ai_provider": "lm_studio",
+        "lm_studio_base_url": server_url,
+        "text_model": model,
+        "vision_model": model,  # LM Studio uses same model for both
     }
 
 
@@ -481,12 +503,14 @@ def configure_cloud_provider(provider: str) -> Optional[Dict]:
     print_section(f"{provider_info['name']} Configuration")
 
     # Show cost warning
-    if 'warning' in provider_info:
+    if "warning" in provider_info:
         print("WARNING:")
         print(f"  {provider_info['warning']}")
         print()
 
-        if not get_yes_no("Do you accept the risk and want to continue?", default=False):
+        if not get_yes_no(
+            "Do you accept the risk and want to continue?", default=False
+        ):
             print("Setup cancelled.")
             return None
 
@@ -502,18 +526,18 @@ def configure_cloud_provider(provider: str) -> Optional[Dict]:
         return None
 
     # Set default models based on provider
-    if provider == 'openai':
-        text_model = 'gpt-4o-mini'
-        vision_model = 'gpt-4o'
-    elif provider == 'gemini':
-        text_model = 'gemini-1.5-flash'
-        vision_model = 'gemini-1.5-flash'
-    elif provider == 'claude':
-        text_model = 'claude-3-5-haiku-20241022'
-        vision_model = 'claude-3-5-haiku-20241022'
+    if provider == "openai":
+        text_model = "gpt-4o-mini"
+        vision_model = "gpt-4o"
+    elif provider == "gemini":
+        text_model = "gemini-1.5-flash"
+        vision_model = "gemini-1.5-flash"
+    elif provider == "claude":
+        text_model = "claude-3-5-haiku-20241022"
+        vision_model = "claude-3-5-haiku-20241022"
     else:
-        text_model = ''
-        vision_model = ''
+        text_model = ""
+        vision_model = ""
 
     print(f"\nDefault models will be used:")
     print(f"  Text: {text_model}")
@@ -521,10 +545,10 @@ def configure_cloud_provider(provider: str) -> Optional[Dict]:
     print()
 
     return {
-        'ai_provider': provider,
-        f'{provider}_api_key': api_key,
-        'text_model': text_model,
-        'vision_model': vision_model,
+        "ai_provider": provider,
+        f"{provider}_api_key": api_key,
+        "text_model": text_model,
+        "vision_model": vision_model,
     }
 
 
@@ -562,9 +586,9 @@ def select_ai_provider() -> Optional[Dict]:
             print(f"Please enter a number between 1 and {len(providers)}")
 
     # Configure selected provider
-    if provider == 'ollama':
+    if provider == "ollama":
         return configure_ollama()
-    elif provider == 'lm_studio':
+    elif provider == "lm_studio":
         return configure_lm_studio()
     else:
         return configure_cloud_provider(provider)
@@ -593,43 +617,43 @@ def add_rss_feed(config: Dict) -> bool:
         return False
 
     # Initialize rss_feeds list if not present
-    if 'rss_feeds' not in config:
-        config['rss_feeds'] = []
+    if "rss_feeds" not in config:
+        config["rss_feeds"] = []
 
     # Check if already exists
-    if feed_url in config['rss_feeds']:
+    if feed_url in config["rss_feeds"]:
         print("This feed is already in your configuration.")
         return False
 
     # Add to config
-    config['rss_feeds'].append(feed_url)
+    config["rss_feeds"].append(feed_url)
 
     # Also append to rss.txt file
     try:
         # Ensure the file ends with a newline before appending
         if RSS_FILE.exists():
-            with open(RSS_FILE, 'rb') as f:
+            with open(RSS_FILE, "rb") as f:
                 f.seek(0, 2)  # Go to end of file
                 if f.tell() > 0:  # File is not empty
                     f.seek(-1, 2)  # Go to last byte
                     last_char = f.read(1)
-                    needs_newline = last_char != b'\n'
+                    needs_newline = last_char != b"\n"
                 else:
                     needs_newline = False
         else:
             needs_newline = False
 
         # Append the feed URL
-        with open(RSS_FILE, 'a') as f:
+        with open(RSS_FILE, "a") as f:
             if needs_newline:
-                f.write('\n')
+                f.write("\n")
             f.write(f"{feed_url}\n")
         print(f"Feed added successfully!")
         return True
     except IOError as e:
         print(f"Error writing to rss.txt: {e}")
         # Remove from config since file write failed
-        config['rss_feeds'].remove(feed_url)
+        config["rss_feeds"].remove(feed_url)
         return False
 
 
@@ -645,41 +669,43 @@ def remove_rss_feed(config: Dict) -> bool:
     """
     print_section("Remove RSS Feed")
 
-    if 'rss_feeds' not in config or not config['rss_feeds']:
+    if "rss_feeds" not in config or not config["rss_feeds"]:
         print("No feeds configured.")
         return False
 
     # Display feeds
     print("Current feeds:\n")
-    for i, feed in enumerate(config['rss_feeds'], 1):
+    for i, feed in enumerate(config["rss_feeds"], 1):
         print(f"  [{i}] {feed}")
     print()
 
     # Get selection
-    response = input(f"Select feed to remove [1-{len(config['rss_feeds'])}, or 'c' to cancel]: ").strip()
+    response = input(
+        f"Select feed to remove [1-{len(config['rss_feeds'])}, or 'c' to cancel]: "
+    ).strip()
 
-    if response.lower() == 'c':
+    if response.lower() == "c":
         return False
 
     try:
         index = int(response) - 1
-        if 0 <= index < len(config['rss_feeds']):
-            feed_to_remove = config['rss_feeds'][index]
+        if 0 <= index < len(config["rss_feeds"]):
+            feed_to_remove = config["rss_feeds"][index]
 
             # Remove from config
-            config['rss_feeds'].pop(index)
+            config["rss_feeds"].pop(index)
 
             # Also remove from rss.txt file
             try:
                 # Read all feeds
-                with open(RSS_FILE, 'r') as f:
+                with open(RSS_FILE, "r") as f:
                     feeds = [line.strip() for line in f if line.strip()]
 
                 # Remove the feed
                 feeds = [f for f in feeds if f != feed_to_remove]
 
                 # Write back
-                with open(RSS_FILE, 'w') as f:
+                with open(RSS_FILE, "w") as f:
                     for feed in feeds:
                         f.write(f"{feed}\n")
 
@@ -689,7 +715,7 @@ def remove_rss_feed(config: Dict) -> bool:
             except IOError as e:
                 print(f"Error updating rss.txt: {e}")
                 # Re-add to config since file write failed
-                config['rss_feeds'].insert(index, feed_to_remove)
+                config["rss_feeds"].insert(index, feed_to_remove)
                 return False
         else:
             print(f"Please enter a number between 1 and {len(config['rss_feeds'])}")
@@ -703,12 +729,12 @@ def view_all_feeds(config: Dict):
     """Display all configured RSS feeds."""
     print_section("RSS Feeds")
 
-    if 'rss_feeds' not in config or not config['rss_feeds']:
+    if "rss_feeds" not in config or not config["rss_feeds"]:
         print("No feeds configured.")
         return
 
     print(f"Total feeds: {len(config['rss_feeds'])}\n")
-    for i, feed in enumerate(config['rss_feeds'], 1):
+    for i, feed in enumerate(config["rss_feeds"], 1):
         print(f"  {i}. {feed}")
     print()
 
@@ -724,8 +750,12 @@ def view_language_overrides():
         return
 
     try:
-        with open(LANGUAGE_OVERRIDE_FILE, 'r') as f:
-            lines = [line.strip() for line in f if line.strip() and not line.strip().startswith('#')]
+        with open(LANGUAGE_OVERRIDE_FILE, "r") as f:
+            lines = [
+                line.strip()
+                for line in f
+                if line.strip() and not line.strip().startswith("#")
+            ]
 
         if not lines:
             print("No language overrides configured.")
@@ -738,8 +768,8 @@ def view_language_overrides():
         # Parse and display overrides
         overrides = []
         for line in lines:
-            if '=' in line:
-                domain, language = line.split('=', 1)
+            if "=" in line:
+                domain, language = line.split("=", 1)
                 domain = domain.strip()
                 language = language.strip()
                 overrides.append((domain, language))
@@ -783,18 +813,21 @@ def add_language_override() -> bool:
 
     # Clean up the domain (extract domain from URL if needed)
     from urllib.parse import urlparse
+
     try:
-        parsed = urlparse(domain if '://' in domain else f'https://{domain}')
+        parsed = urlparse(domain if "://" in domain else f"https://{domain}")
         # Keep the full path for feeds like feedburner.com/psblog
-        if parsed.path and parsed.path != '/':
-            domain_key = f"{parsed.netloc}{parsed.path}".rstrip('/')
+        if parsed.path and parsed.path != "/":
+            domain_key = f"{parsed.netloc}{parsed.path}".rstrip("/")
         else:
             domain_key = parsed.netloc
     except Exception:
         domain_key = domain
 
     print()
-    print("Common languages: English, Italian, Spanish, French, German, Chinese, Japanese")
+    print(
+        "Common languages: English, Italian, Spanish, French, German, Chinese, Japanese"
+    )
     print("You can enter any language name.")
     print()
 
@@ -813,11 +846,11 @@ def add_language_override() -> bool:
         other_lines = []
 
         if LANGUAGE_OVERRIDE_FILE.exists():
-            with open(LANGUAGE_OVERRIDE_FILE, 'r') as f:
+            with open(LANGUAGE_OVERRIDE_FILE, "r") as f:
                 for line in f:
                     stripped = line.strip()
-                    if stripped and not stripped.startswith('#') and '=' in stripped:
-                        d, l = stripped.split('=', 1)
+                    if stripped and not stripped.startswith("#") and "=" in stripped:
+                        d, l = stripped.split("=", 1)
                         d = d.strip()
                         existing_overrides[d] = l.strip()
                     else:
@@ -825,7 +858,9 @@ def add_language_override() -> bool:
                         other_lines.append(line)
 
         if domain_key in existing_overrides:
-            print(f"\nOverride already exists: {domain_key} → {existing_overrides[domain_key]}")
+            print(
+                f"\nOverride already exists: {domain_key} → {existing_overrides[domain_key]}"
+            )
             if not get_yes_no("Replace with new language?", default=False):
                 return False
             # Update the override
@@ -835,7 +870,7 @@ def add_language_override() -> bool:
             existing_overrides[domain_key] = language
 
         # Write all overrides back
-        with open(LANGUAGE_OVERRIDE_FILE, 'w') as f:
+        with open(LANGUAGE_OVERRIDE_FILE, "w") as f:
             # Write comments and blank lines first
             for line in other_lines:
                 f.write(line)
@@ -867,7 +902,7 @@ def remove_language_override() -> bool:
 
     try:
         # Read all overrides
-        with open(LANGUAGE_OVERRIDE_FILE, 'r') as f:
+        with open(LANGUAGE_OVERRIDE_FILE, "r") as f:
             lines = f.readlines()
 
         # Parse valid overrides
@@ -875,8 +910,8 @@ def remove_language_override() -> bool:
         other_lines = []
         for line in lines:
             stripped = line.strip()
-            if stripped and not stripped.startswith('#') and '=' in stripped:
-                domain, language = stripped.split('=', 1)
+            if stripped and not stripped.startswith("#") and "=" in stripped:
+                domain, language = stripped.split("=", 1)
                 overrides.append((domain.strip(), language.strip()))
             else:
                 # Preserve comments and blank lines
@@ -893,9 +928,11 @@ def remove_language_override() -> bool:
         print()
 
         # Get selection
-        response = input(f"Select override to remove [1-{len(overrides)}, or 'c' to cancel]: ").strip()
+        response = input(
+            f"Select override to remove [1-{len(overrides)}, or 'c' to cancel]: "
+        ).strip()
 
-        if response.lower() == 'c':
+        if response.lower() == "c":
             return False
 
         try:
@@ -907,7 +944,7 @@ def remove_language_override() -> bool:
                 overrides.pop(index)
 
                 # Write back (comments first, then overrides)
-                with open(LANGUAGE_OVERRIDE_FILE, 'w') as f:
+                with open(LANGUAGE_OVERRIDE_FILE, "w") as f:
                     # Write comments and blank lines
                     for line in other_lines:
                         f.write(line)
@@ -916,7 +953,9 @@ def remove_language_override() -> bool:
                     for domain, language in overrides:
                         f.write(f"{domain} = {language}\n")
 
-                print(f"\nLanguage override removed: {removed_domain} → {removed_language}")
+                print(
+                    f"\nLanguage override removed: {removed_domain} → {removed_language}"
+                )
                 return True
             else:
                 print(f"Please enter a number between 1 and {len(overrides)}")
@@ -965,12 +1004,12 @@ def test_ai_connection(config: Dict):
     """Test connection to configured AI provider."""
     print_section("Test AI Connection")
 
-    provider = config.get('ai_provider', 'ollama')
+    provider = config.get("ai_provider", "ollama")
     print(f"Testing connection to {AI_PROVIDERS[provider]['name']}...\n")
 
     try:
-        if provider == 'ollama':
-            url = config.get('ollama_base_url', 'http://localhost:11434')
+        if provider == "ollama":
+            url = config.get("ollama_base_url", "http://localhost:11434")
             if test_ollama_connection(url):
                 print("Connection successful!")
                 inspector = OllamaInspector(url)
@@ -979,21 +1018,25 @@ def test_ai_connection(config: Dict):
             else:
                 print("Connection failed!")
 
-        elif provider == 'lm_studio':
-            url = config.get('lm_studio_base_url', 'http://localhost:1234')
+        elif provider == "lm_studio":
+            url = config.get("lm_studio_base_url", "http://localhost:1234")
             if test_lm_studio_connection(url):
                 print("Connection successful!")
                 models = get_lm_studio_models(url)
-                print(f"\nAvailable models: {', '.join([m.get('id', '') for m in models])}")
+                print(
+                    f"\nAvailable models: {', '.join([m.get('id', '') for m in models])}"
+                )
             else:
                 print("Connection failed!")
 
         else:
             # Cloud providers
-            api_key = config.get(f'{provider}_api_key', '')
+            api_key = config.get(f"{provider}_api_key", "")
             if api_key:
                 print(f"API key configured: {api_key[:8]}...")
-                print("Note: Cannot test cloud provider connection without making an API call.")
+                print(
+                    "Note: Cannot test cloud provider connection without making an API call."
+                )
             else:
                 print("No API key configured!")
 
@@ -1005,17 +1048,17 @@ def display_config_summary(config: Dict):
     """Display a summary of current configuration."""
     print_header("Current Configuration")
 
-    provider = config.get('ai_provider', 'unknown')
-    provider_info = AI_PROVIDERS.get(provider, {'name': provider})
+    provider = config.get("ai_provider", "unknown")
+    provider_info = AI_PROVIDERS.get(provider, {"name": provider})
 
     print(f"AI Provider: {provider_info['name']}")
 
-    if provider == 'ollama':
+    if provider == "ollama":
         print(f"Server URL: {config.get('ollama_base_url', 'Not configured')}")
-    elif provider == 'lm_studio':
+    elif provider == "lm_studio":
         print(f"Server URL: {config.get('lm_studio_base_url', 'Not configured')}")
     else:
-        api_key = config.get(f'{provider}_api_key', '')
+        api_key = config.get(f"{provider}_api_key", "")
         if api_key:
             print(f"API Key: {api_key[:8]}... (configured)")
         else:
@@ -1024,7 +1067,7 @@ def display_config_summary(config: Dict):
     print(f"Text Model: {config.get('text_model', 'Not configured')}")
     print(f"Vision Model: {config.get('vision_model', 'Not configured (optional)')}")
 
-    feed_count = len(config.get('rss_feeds', []))
+    feed_count = len(config.get("rss_feeds", []))
     print(f"RSS Feeds: {feed_count} configured")
     print()
 
@@ -1039,8 +1082,10 @@ def check_for_updates():
     # Step 1: Verify we're in a git repository
     try:
         result = subprocess.run(
-            ['git', 'rev-parse', '--is-inside-work-tree'],
-            capture_output=True, text=True, timeout=5
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode != 0:
             print("This directory is not a git repository.")
@@ -1058,14 +1103,13 @@ def check_for_updates():
     print("Fetching latest changes from remote...")
     try:
         result = subprocess.run(
-            ['git', 'fetch', 'origin'],
-            capture_output=True, text=True, timeout=10
+            ["git", "fetch", "origin"], capture_output=True, text=True, timeout=10
         )
         if result.returncode != 0:
             stderr = result.stderr.strip()
-            if 'Could not resolve host' in stderr or 'unable to access' in stderr:
+            if "Could not resolve host" in stderr or "unable to access" in stderr:
                 print("No network connection available. Cannot check for updates.")
-            elif 'No such remote' in stderr or "doesn't have any remote" in stderr:
+            elif "No such remote" in stderr or "doesn't have any remote" in stderr:
                 print("No remote 'origin' configured for this repository.")
                 print("Updates cannot be checked without a remote.")
             else:
@@ -1078,12 +1122,14 @@ def check_for_updates():
     # Step 3: Check how many commits we are behind
     try:
         result = subprocess.run(
-            ['git', 'rev-list', '--count', 'HEAD..origin/master'],
-            capture_output=True, text=True, timeout=5
+            ["git", "rev-list", "--count", "HEAD..origin/master"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode != 0:
             stderr = result.stderr.strip()
-            if 'unknown revision' in stderr:
+            if "unknown revision" in stderr:
                 print("Remote branch 'origin/master' not found.")
                 print("The remote repository may use a different branch name.")
             else:
@@ -1108,12 +1154,14 @@ def check_for_updates():
     # Show recent commit messages
     try:
         result = subprocess.run(
-            ['git', 'log', '--oneline', 'HEAD..origin/master'],
-            capture_output=True, text=True, timeout=5
+            ["git", "log", "--oneline", "HEAD..origin/master"],
+            capture_output=True,
+            text=True,
+            timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
             print("New changes:")
-            for line in result.stdout.strip().split('\n'):
+            for line in result.stdout.strip().split("\n"):
                 print(f"  {line}")
             print()
     except (subprocess.TimeoutExpired, Exception):
@@ -1127,8 +1175,10 @@ def check_for_updates():
     print("\nPulling updates...")
     try:
         result = subprocess.run(
-            ['git', 'pull', 'origin', 'master'],
-            capture_output=True, text=True, timeout=30
+            ["git", "pull", "origin", "master"],
+            capture_output=True,
+            text=True,
+            timeout=30,
         )
         if result.returncode == 0:
             print("Update successful!")
@@ -1137,7 +1187,7 @@ def check_for_updates():
         else:
             stderr = result.stderr.strip()
             stdout = result.stdout.strip()
-            if 'CONFLICT' in stdout or 'CONFLICT' in stderr:
+            if "CONFLICT" in stdout or "CONFLICT" in stderr:
                 print("Update failed due to merge conflicts.")
                 print("You have local changes that conflict with the update.")
                 print("\nTo resolve manually:")
@@ -1147,7 +1197,7 @@ def check_for_updates():
                 print("  4. Run: git commit")
                 print("\nOr to discard local changes and force update:")
                 print("  git reset --hard origin/master")
-            elif 'uncommitted changes' in stderr or 'local changes' in stderr:
+            elif "uncommitted changes" in stderr or "local changes" in stderr:
                 print("Update failed: you have uncommitted local changes.")
                 print("Please commit or stash your changes first:")
                 print("  git stash        (to temporarily save changes)")
@@ -1156,7 +1206,9 @@ def check_for_updates():
             else:
                 print(f"Update failed: {stderr or stdout}")
     except subprocess.TimeoutExpired:
-        print("Update timed out. Please try again or run 'git pull origin master' manually.")
+        print(
+            "Update timed out. Please try again or run 'git pull origin master' manually."
+        )
 
 
 def interactive_menu(config: Dict):
@@ -1184,112 +1236,123 @@ def interactive_menu(config: Dict):
         print(" [11] Remove language override")
         print(" [12] Clear language cache")
         print(" [13] Check for updates")
-        print(" [14] Exit")
+        print(" [14] Toggle ad detection")
+        print(" [15] Exit")
         print()
 
-        choice = input("Select option [1-14]: ").strip()
+        choice = input("Select option [1-15]: ").strip()
 
-        if choice == '1':
+        if choice == "1":
             # Change AI provider (requires full reconfiguration)
             print("\nChanging AI provider requires full reconfiguration.")
             if get_yes_no("Continue?", default=False):
                 new_config = select_ai_provider()
                 if new_config:
                     # Preserve RSS feeds
-                    new_config['rss_feeds'] = config.get('rss_feeds', [])
-                    new_config['first_run_complete'] = True
+                    new_config["rss_feeds"] = config.get("rss_feeds", [])
+                    new_config["first_run_complete"] = True
                     config.clear()
                     config.update(new_config)
                     save_config(config)
                     print("\nConfiguration updated!")
                     input("Press Enter to continue...")
 
-        elif choice == '2':
+        elif choice == "2":
             # Change text model
-            provider = config.get('ai_provider', 'ollama')
+            provider = config.get("ai_provider", "ollama")
 
-            if provider == 'ollama':
-                inspector = OllamaInspector(config.get('ollama_base_url', 'http://localhost:11434'))
-                model = select_ollama_model(inspector, 'text')
+            if provider == "ollama":
+                inspector = OllamaInspector(
+                    config.get("ollama_base_url", "http://localhost:11434")
+                )
+                model = select_ollama_model(inspector, "text")
                 if model:
-                    config['text_model'] = model
+                    config["text_model"] = model
                     save_config(config)
                     print("\nText model updated!")
                     input("Press Enter to continue...")
 
-            elif provider == 'lm_studio':
-                model = select_lm_studio_model(config.get('lm_studio_base_url', 'http://localhost:1234'))
+            elif provider == "lm_studio":
+                model = select_lm_studio_model(
+                    config.get("lm_studio_base_url", "http://localhost:1234")
+                )
                 if model:
-                    config['text_model'] = model
-                    config['vision_model'] = model  # LM Studio uses same model
+                    config["text_model"] = model
+                    config["vision_model"] = model  # LM Studio uses same model
                     save_config(config)
                     print("\nModel updated!")
                     input("Press Enter to continue...")
 
             else:
                 print("\nManual model configuration for cloud providers:")
-                model = get_input("Enter text model name", default=config.get('text_model', ''))
+                model = get_input(
+                    "Enter text model name", default=config.get("text_model", "")
+                )
                 if model:
-                    config['text_model'] = model
+                    config["text_model"] = model
                     save_config(config)
                     print("\nText model updated!")
                     input("Press Enter to continue...")
 
-        elif choice == '3':
+        elif choice == "3":
             # Change vision model
-            provider = config.get('ai_provider', 'ollama')
+            provider = config.get("ai_provider", "ollama")
 
-            if provider == 'ollama':
-                inspector = OllamaInspector(config.get('ollama_base_url', 'http://localhost:11434'))
-                model = select_ollama_model(inspector, 'vision')
+            if provider == "ollama":
+                inspector = OllamaInspector(
+                    config.get("ollama_base_url", "http://localhost:11434")
+                )
+                model = select_ollama_model(inspector, "vision")
                 if model:
-                    config['vision_model'] = model
+                    config["vision_model"] = model
                     save_config(config)
                     print("\nVision model updated!")
                 elif model is None:
                     # User chose to skip
-                    config['vision_model'] = None
+                    config["vision_model"] = None
                     save_config(config)
                     print("\nVision model cleared!")
                 input("Press Enter to continue...")
 
-            elif provider == 'lm_studio':
+            elif provider == "lm_studio":
                 print("\nLM Studio uses the same model for text and vision.")
                 print("Please use option [2] to change the model.")
                 input("Press Enter to continue...")
 
             else:
                 print("\nManual vision model configuration:")
-                model = get_input("Enter vision model name", default=config.get('vision_model', ''))
+                model = get_input(
+                    "Enter vision model name", default=config.get("vision_model", "")
+                )
                 if model:
-                    config['vision_model'] = model
+                    config["vision_model"] = model
                     save_config(config)
                     print("\nVision model updated!")
                     input("Press Enter to continue...")
 
-        elif choice == '4':
+        elif choice == "4":
             # Add RSS feed
             if add_rss_feed(config):
                 save_config(config)
             input("Press Enter to continue...")
 
-        elif choice == '5':
+        elif choice == "5":
             # Remove RSS feed
             if remove_rss_feed(config):
                 save_config(config)
             input("Press Enter to continue...")
 
-        elif choice == '6':
+        elif choice == "6":
             # View all feeds
             view_all_feeds(config)
             input("Press Enter to continue...")
 
-        elif choice == '7':
+        elif choice == "7":
             # Test AI connection
             test_ai_connection(config)
             input("Press Enter to continue...")
 
-        elif choice == '8':
+        elif choice == "8":
             # Reset configuration
             print("\nThis will delete your current configuration.")
             if get_yes_no("Are you sure?", default=False):
@@ -1299,38 +1362,58 @@ def interactive_menu(config: Dict):
                 input("Press Enter to exit...")
                 break
 
-        elif choice == '9':
+        elif choice == "9":
             # View language overrides
             view_language_overrides()
             input("Press Enter to continue...")
 
-        elif choice == '10':
+        elif choice == "10":
             # Add language override
             add_language_override()
             input("Press Enter to continue...")
 
-        elif choice == '11':
+        elif choice == "11":
             # Remove language override
             remove_language_override()
             input("Press Enter to continue...")
 
-        elif choice == '12':
+        elif choice == "12":
             # Clear language cache
             clear_language_cache()
             input("Press Enter to continue...")
 
-        elif choice == '13':
+        elif choice == "13":
             # Check for updates
             check_for_updates()
             input("Press Enter to continue...")
 
-        elif choice == '14':
+        elif choice == "14":
+            # Toggle ad detection
+            current_setting = config.get("enable_ad_detection", True)
+            status = "enabled" if current_setting else "disabled"
+            print(f"\nAd detection is currently {status}.")
+            print(
+                "When enabled, the AI will attempt to detect advertisements and sponsored content."
+            )
+            print("Note: This feature can be overly sensitive with some models.")
+            new_setting = get_yes_no(
+                "Enable ad detection?"
+                if not current_setting
+                else "Disable ad detection?",
+                default=not current_setting,
+            )
+            config["enable_ad_detection"] = new_setting
+            save_config(config)
+            print(f"\nAd detection {'enabled' if new_setting else 'disabled'}!")
+            input("Press Enter to continue...")
+
+        elif choice == "15":
             # Exit
             print("\nExiting configuration wizard.")
             break
 
         else:
-            print("\nInvalid option. Please select 1-14.")
+            print("\nInvalid option. Please select 1-15.")
             input("Press Enter to continue...")
 
 
@@ -1368,21 +1451,24 @@ def first_run_setup() -> Optional[Dict]:
     print("You need to add at least one RSS feed to get started.")
     print()
 
-    config['rss_feeds'] = []
+    config["rss_feeds"] = []
 
     while True:
         if add_rss_feed(config):
-            if len(config['rss_feeds']) >= 1:
+            if len(config["rss_feeds"]) >= 1:
                 if not get_yes_no("\nAdd another feed?", default=True):
                     break
         else:
-            if len(config['rss_feeds']) == 0:
+            if len(config["rss_feeds"]) == 0:
                 print("\nYou must add at least one feed to continue.")
             else:
                 break
 
     # Mark first run as complete
-    config['first_run_complete'] = True
+    config["first_run_complete"] = True
+
+    # Feature toggles - set defaults
+    config["enable_ad_detection"] = True  # Ad detection enabled by default
 
     # Save configuration
     if save_config(config):
@@ -1407,7 +1493,7 @@ def main():
         # Check if configuration exists
         config = load_config()
 
-        if config and config.get('first_run_complete'):
+        if config and config.get("first_run_complete"):
             # Existing configuration - show menu
             interactive_menu(config)
         else:
@@ -1423,9 +1509,10 @@ def main():
     except Exception as e:
         print(f"\n\nUnexpected error: {e}")
         import traceback
+
         traceback.print_exc()
         sys.exit(1)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

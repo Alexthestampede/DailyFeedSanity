@@ -19,6 +19,7 @@ from ..config import (
     CLICKBAIT_DETECTION_TEMPERATURE,
     CLICKBAIT_AUTHORS,
     AD_DETECTION_TEMPERATURE,
+    ENABLE_AD_DETECTION,
 )
 
 logger = get_logger(__name__)
@@ -33,15 +34,20 @@ class DomainTextProcessor:
     the underlying generic generate() method.
     """
 
-    def __init__(self, text_processor):
+    def __init__(self, text_processor, enable_ad_detection=None):
         """
         Initialize domain text processor.
 
         Args:
             text_processor: ModuLLe BaseTextProcessor instance (has generate() method)
+            enable_ad_detection: Enable ad detection feature (default from config)
         """
         self.processor = text_processor
         self.current_date = datetime.now().strftime("%Y-%m-%d")
+        if enable_ad_detection is not None:
+            self.enable_ad_detection = enable_ad_detection
+        else:
+            self.enable_ad_detection = ENABLE_AD_DETECTION
 
     def generate(self, prompt, system_prompt=None, temperature=0.7, max_tokens=None):
         """
@@ -215,7 +221,7 @@ class DomainTextProcessor:
 
         # Ad detection
         is_ad = False
-        if title:
+        if title and ENABLE_AD_DETECTION:
             try:
                 is_ad = self.detect_ad(title, text)
             except Exception as e:

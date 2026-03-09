@@ -4,6 +4,7 @@ Factory for creating AI client and text processor instances.
 Uses ModuLLe (vendored in lib/modulle/) for generic AI provider abstraction,
 then wraps the results in domain-specific processors for DailyFeedSanity.
 """
+
 from typing import Tuple, Optional
 from ..utils.logging_config import get_logger
 from .domain_text_processor import DomainTextProcessor
@@ -21,6 +22,7 @@ def _load_user_config():
     """
     try:
         from ..utils.config_wizard import load_config
+
         config = load_config()
         if config:
             logger.info("Loaded user configuration from .config.json")
@@ -40,8 +42,8 @@ def _resolve_provider_config(user_config):
     from .. import config as app_config
 
     # Determine provider
-    if user_config and 'ai_provider' in user_config:
-        provider = user_config['ai_provider'].lower()
+    if user_config and "ai_provider" in user_config:
+        provider = user_config["ai_provider"].lower()
     else:
         provider = app_config.AI_PROVIDER.lower()
 
@@ -49,47 +51,47 @@ def _resolve_provider_config(user_config):
 
     # Provider-specific config resolution
     provider_defaults = {
-        'ollama': {
-            'text_model': app_config.TEXT_MODEL,
-            'vision_model': app_config.VISION_MODEL,
-            'base_url': app_config.OLLAMA_BASE_URL,
-            'api_key': None,
+        "ollama": {
+            "text_model": app_config.TEXT_MODEL,
+            "vision_model": app_config.VISION_MODEL,
+            "base_url": app_config.OLLAMA_BASE_URL,
+            "api_key": None,
         },
-        'lm_studio': {
-            'text_model': app_config.LM_STUDIO_TEXT_MODEL,
-            'vision_model': app_config.LM_STUDIO_VISION_MODEL,
-            'base_url': app_config.LM_STUDIO_BASE_URL,
-            'api_key': None,
+        "lm_studio": {
+            "text_model": app_config.LM_STUDIO_TEXT_MODEL,
+            "vision_model": app_config.LM_STUDIO_VISION_MODEL,
+            "base_url": app_config.LM_STUDIO_BASE_URL,
+            "api_key": None,
         },
-        'lmstudio': {  # alias
-            'text_model': app_config.LM_STUDIO_TEXT_MODEL,
-            'vision_model': app_config.LM_STUDIO_VISION_MODEL,
-            'base_url': app_config.LM_STUDIO_BASE_URL,
-            'api_key': None,
+        "lmstudio": {  # alias
+            "text_model": app_config.LM_STUDIO_TEXT_MODEL,
+            "vision_model": app_config.LM_STUDIO_VISION_MODEL,
+            "base_url": app_config.LM_STUDIO_BASE_URL,
+            "api_key": None,
         },
-        'openai': {
-            'text_model': app_config.OPENAI_TEXT_MODEL,
-            'vision_model': app_config.OPENAI_VISION_MODEL,
-            'base_url': None,
-            'api_key': app_config.OPENAI_API_KEY,
+        "openai": {
+            "text_model": app_config.OPENAI_TEXT_MODEL,
+            "vision_model": app_config.OPENAI_VISION_MODEL,
+            "base_url": None,
+            "api_key": app_config.OPENAI_API_KEY,
         },
-        'gemini': {
-            'text_model': app_config.GEMINI_TEXT_MODEL,
-            'vision_model': app_config.GEMINI_VISION_MODEL,
-            'base_url': None,
-            'api_key': app_config.GEMINI_API_KEY,
+        "gemini": {
+            "text_model": app_config.GEMINI_TEXT_MODEL,
+            "vision_model": app_config.GEMINI_VISION_MODEL,
+            "base_url": None,
+            "api_key": app_config.GEMINI_API_KEY,
         },
-        'claude': {
-            'text_model': app_config.CLAUDE_TEXT_MODEL,
-            'vision_model': app_config.CLAUDE_VISION_MODEL,
-            'base_url': None,
-            'api_key': app_config.ANTHROPIC_API_KEY,
+        "claude": {
+            "text_model": app_config.CLAUDE_TEXT_MODEL,
+            "vision_model": app_config.CLAUDE_VISION_MODEL,
+            "base_url": None,
+            "api_key": app_config.ANTHROPIC_API_KEY,
         },
-        'anthropic': {  # alias
-            'text_model': app_config.CLAUDE_TEXT_MODEL,
-            'vision_model': app_config.CLAUDE_VISION_MODEL,
-            'base_url': None,
-            'api_key': app_config.ANTHROPIC_API_KEY,
+        "anthropic": {  # alias
+            "text_model": app_config.CLAUDE_TEXT_MODEL,
+            "vision_model": app_config.CLAUDE_VISION_MODEL,
+            "base_url": None,
+            "api_key": app_config.ANTHROPIC_API_KEY,
         },
     }
 
@@ -97,36 +99,44 @@ def _resolve_provider_config(user_config):
 
     # User config overrides
     resolved = {
-        'provider': provider,
-        'text_model': defaults.get('text_model', ''),
-        'vision_model': defaults.get('vision_model'),
-        'base_url': defaults.get('base_url'),
-        'api_key': defaults.get('api_key'),
+        "provider": provider,
+        "text_model": defaults.get("text_model", ""),
+        "vision_model": defaults.get("vision_model"),
+        "base_url": defaults.get("base_url"),
+        "api_key": defaults.get("api_key"),
     }
 
     if user_config:
-        resolved['text_model'] = user_config.get('text_model', resolved['text_model'])
-        resolved['vision_model'] = user_config.get('vision_model', resolved['vision_model'])
+        resolved["text_model"] = user_config.get("text_model", resolved["text_model"])
+        resolved["vision_model"] = user_config.get(
+            "vision_model", resolved["vision_model"]
+        )
 
         # Provider-specific URL/key overrides
-        if provider in ('ollama',):
-            resolved['base_url'] = user_config.get('ollama_base_url', resolved['base_url'])
-        elif provider in ('lm_studio', 'lmstudio'):
-            resolved['base_url'] = user_config.get('lm_studio_base_url', resolved['base_url'])
-        elif provider == 'openai':
-            resolved['api_key'] = user_config.get('openai_api_key', resolved['api_key'])
-        elif provider == 'gemini':
-            resolved['api_key'] = user_config.get('gemini_api_key', resolved['api_key'])
-        elif provider in ('claude', 'anthropic'):
-            resolved['api_key'] = user_config.get(
-                'claude_api_key',
-                user_config.get('anthropic_api_key', resolved['api_key'])
+        if provider in ("ollama",):
+            resolved["base_url"] = user_config.get(
+                "ollama_base_url", resolved["base_url"]
+            )
+        elif provider in ("lm_studio", "lmstudio"):
+            resolved["base_url"] = user_config.get(
+                "lm_studio_base_url", resolved["base_url"]
+            )
+        elif provider == "openai":
+            resolved["api_key"] = user_config.get("openai_api_key", resolved["api_key"])
+        elif provider == "gemini":
+            resolved["api_key"] = user_config.get("gemini_api_key", resolved["api_key"])
+        elif provider in ("claude", "anthropic"):
+            resolved["api_key"] = user_config.get(
+                "claude_api_key",
+                user_config.get("anthropic_api_key", resolved["api_key"]),
             )
 
     return resolved
 
 
-def create_ai_client() -> Tuple[object, DomainTextProcessor, Optional[DomainVisionProcessor]]:
+def create_ai_client() -> Tuple[
+    object, DomainTextProcessor, Optional[DomainVisionProcessor]
+]:
     """
     Create AI client, domain text processor, and domain vision processor.
 
@@ -153,22 +163,28 @@ def create_ai_client() -> Tuple[object, DomainTextProcessor, Optional[DomainVisi
 
     # Create generic ModuLLe client + processors
     client, text_proc, vision_proc = modulle_create(
-        provider=resolved['provider'],
-        text_model=resolved['text_model'],
-        vision_model=resolved.get('vision_model'),
-        base_url=resolved.get('base_url'),
-        api_key=resolved.get('api_key'),
+        provider=resolved["provider"],
+        text_model=resolved["text_model"],
+        vision_model=resolved.get("vision_model"),
+        base_url=resolved.get("base_url"),
+        api_key=resolved.get("api_key"),
     )
 
     # Wrap in domain-specific processors
-    domain_text = DomainTextProcessor(text_proc)
+    domain_text = DomainTextProcessor(
+        text_proc, enable_ad_detection=user_config.get("enable_ad_detection", True)
+    )
     domain_vision = DomainVisionProcessor(vision_proc) if vision_proc else None
 
-    logger.info(f"AI client initialized successfully (provider: {resolved['provider']})")
+    logger.info(
+        f"AI client initialized successfully (provider: {resolved['provider']})"
+    )
     return client, domain_text, domain_vision
 
 
-def create_ai_client_with_fallback() -> Tuple[object, DomainTextProcessor, Optional[DomainVisionProcessor]]:
+def create_ai_client_with_fallback() -> Tuple[
+    object, DomainTextProcessor, Optional[DomainVisionProcessor]
+]:
     """
     Create AI client with fallback to Ollama if configured provider fails.
 
@@ -187,24 +203,32 @@ def create_ai_client_with_fallback() -> Tuple[object, DomainTextProcessor, Optio
         from .. import config as app_config
 
         attempted_provider = (
-            user_config.get('ai_provider', app_config.AI_PROVIDER).lower()
-            if user_config else app_config.AI_PROVIDER.lower()
+            user_config.get("ai_provider", app_config.AI_PROVIDER).lower()
+            if user_config
+            else app_config.AI_PROVIDER.lower()
         )
 
-        if attempted_provider != 'ollama':
+        if attempted_provider != "ollama":
             logger.info("Falling back to Ollama provider")
             try:
                 from lib.modulle import create_ai_client as modulle_create
 
                 client, text_proc, vision_proc = modulle_create(
-                    provider='ollama',
+                    provider="ollama",
                     text_model=app_config.TEXT_MODEL,
                     vision_model=app_config.VISION_MODEL,
                     base_url=app_config.OLLAMA_BASE_URL,
                 )
 
-                domain_text = DomainTextProcessor(text_proc)
-                domain_vision = DomainVisionProcessor(vision_proc) if vision_proc else None
+                domain_text = DomainTextProcessor(
+                    text_proc,
+                    enable_ad_detection=user_config.get("enable_ad_detection", True)
+                    if user_config
+                    else True,
+                )
+                domain_vision = (
+                    DomainVisionProcessor(vision_proc) if vision_proc else None
+                )
 
                 logger.info("Ollama fallback client initialized successfully")
                 return client, domain_text, domain_vision
