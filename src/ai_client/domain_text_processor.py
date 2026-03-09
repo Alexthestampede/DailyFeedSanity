@@ -9,6 +9,8 @@ Wraps ModuLLe's generic BaseTextProcessor with RSS-specific methods:
 
 All methods build domain prompts and delegate to ModuLLe's generate().
 """
+
+from datetime import datetime
 from typing import Optional, Dict, Any
 from ..utils.logging_config import get_logger
 from ..config import (
@@ -39,6 +41,7 @@ class DomainTextProcessor:
             text_processor: ModuLLe BaseTextProcessor instance (has generate() method)
         """
         self.processor = text_processor
+        self.current_date = datetime.now().strftime("%Y-%m-%d")
 
     def generate(self, prompt, system_prompt=None, temperature=0.7, max_tokens=None):
         """
@@ -60,7 +63,7 @@ class DomainTextProcessor:
             prompt=prompt,
             system_prompt=system_prompt,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
         )
 
     def detect_clickbait(self, title, text):
@@ -99,7 +102,7 @@ class DomainTextProcessor:
             response = self.processor.generate(
                 prompt=user_prompt,
                 system_prompt=system_prompt,
-                temperature=CLICKBAIT_DETECTION_TEMPERATURE
+                temperature=CLICKBAIT_DETECTION_TEMPERATURE,
             )
 
             if not response:
@@ -107,7 +110,7 @@ class DomainTextProcessor:
                 return False
 
             response_lower = response.strip().lower()
-            if 'yes' in response_lower:
+            if "yes" in response_lower:
                 logger.info(f"AI detected clickbait: {title[:50]}...")
                 return True
             return False
@@ -152,7 +155,7 @@ class DomainTextProcessor:
             response = self.processor.generate(
                 prompt=user_prompt,
                 system_prompt=system_prompt,
-                temperature=AD_DETECTION_TEMPERATURE
+                temperature=AD_DETECTION_TEMPERATURE,
             )
 
             if not response:
@@ -160,7 +163,7 @@ class DomainTextProcessor:
                 return False
 
             response_lower = response.strip().lower()
-            if 'yes' in response_lower:
+            if "yes" in response_lower:
                 logger.info(f"AI detected ad/sponsored content: {title[:50]}...")
                 return True
             return False
@@ -169,7 +172,9 @@ class DomainTextProcessor:
             logger.error(f"Error in ad detection: {e}")
             return False
 
-    def generate_summary(self, text, title=None, author=None, language="English", max_length=500):
+    def generate_summary(
+        self, text, title=None, author=None, language="English", max_length=500
+    ):
         """
         Generate a summary of the article text.
 
@@ -230,7 +235,7 @@ class DomainTextProcessor:
             summary = self.processor.generate(
                 prompt=user_prompt,
                 system_prompt=system_prompt,
-                temperature=TEXT_SUMMARY_TEMPERATURE
+                temperature=TEXT_SUMMARY_TEMPERATURE,
             )
 
             if not summary:
@@ -239,17 +244,17 @@ class DomainTextProcessor:
 
             # Truncate if too long
             if len(summary) > max_length:
-                summary = summary[:max_length].rsplit('.', 1)[0] + '.'
+                summary = summary[:max_length].rsplit(".", 1)[0] + "."
 
             # Generate title from summary
             generated_title = self.generate_title(summary, language=language)
 
             return {
-                'summary': summary,
-                'title': generated_title,
-                'is_clickbait': is_clickbait,
-                'clickbait_detected_by': clickbait_detected_by,
-                'is_ad': is_ad,
+                "summary": summary,
+                "title": generated_title,
+                "is_clickbait": is_clickbait,
+                "clickbait_detected_by": clickbait_detected_by,
+                "is_ad": is_ad,
             }
 
         except Exception as e:
@@ -282,13 +287,13 @@ class DomainTextProcessor:
             title = self.processor.generate(
                 prompt=user_prompt,
                 system_prompt=system_prompt,
-                temperature=TEXT_TITLE_TEMPERATURE
+                temperature=TEXT_TITLE_TEMPERATURE,
             )
 
             if not title:
                 return "Article Summary"
 
-            title = title.strip().strip('"\'')
+            title = title.strip().strip("\"'")
             if len(title) > 80:
                 title = title[:77] + "..."
 
@@ -308,25 +313,26 @@ class DomainTextProcessor:
         Returns:
             dict with summary results, or None on error
         """
-        text = article_data.get('text', '')
-        author = article_data.get('author')
-        original_title = article_data.get('title', '')
-        url = article_data.get('url', '')
+        text = article_data.get("text", "")
+        author = article_data.get("author")
+        original_title = article_data.get("title", "")
+        url = article_data.get("url", "")
 
         logger.info(f"Summarizing article: {original_title[:50]}...")
 
         result = self.generate_summary(text, title=original_title, author=author)
 
         if result:
-            result['original_title'] = original_title
-            result['url'] = url
-            result['author'] = author
+            result["original_title"] = original_title
+            result["url"] = url
+            result["author"] = author
 
         return result
 
     def _get_standard_prompt(self):
         """Get standard summarization system prompt."""
         return (
+            f"Today is {self.current_date}. "
             "You are a professional news summarizer. "
             "Provide clear, concise, and objective summaries of articles. "
             "Focus on the key facts, main points, and important details. "
@@ -337,6 +343,7 @@ class DomainTextProcessor:
     def _get_clickbait_prompt(self):
         """Get clickbait-specific summarization system prompt."""
         return (
+            f"Today is {self.current_date}. "
             "This article shows signs of clickbait or sensationalism. "
             "Provide an objective, factual summary that strips away dramatic language "
             "and focuses on verifiable facts only. "
