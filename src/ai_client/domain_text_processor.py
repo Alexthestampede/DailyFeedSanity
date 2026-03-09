@@ -34,20 +34,17 @@ class DomainTextProcessor:
     the underlying generic generate() method.
     """
 
-    def __init__(self, text_processor, enable_ad_detection=None):
+    def __init__(self, text_processor, enable_ad_detection=True):
         """
         Initialize domain text processor.
 
         Args:
             text_processor: ModuLLe BaseTextProcessor instance (has generate() method)
-            enable_ad_detection: Enable ad detection feature (default from config)
+            enable_ad_detection: Enable ad detection feature (default: True)
         """
         self.processor = text_processor
         self.current_date = datetime.now().strftime("%Y-%m-%d")
-        if enable_ad_detection is not None:
-            self.enable_ad_detection = enable_ad_detection
-        else:
-            self.enable_ad_detection = ENABLE_AD_DETECTION
+        self.enable_ad_detection = enable_ad_detection
 
     def generate(self, prompt, system_prompt=None, temperature=0.7, max_tokens=None):
         """
@@ -223,9 +220,14 @@ class DomainTextProcessor:
         is_ad = False
         if title and self.enable_ad_detection:
             try:
+                logger.info(
+                    f"Running ad detection (enabled={self.enable_ad_detection})"
+                )
                 is_ad = self.detect_ad(title, text)
             except Exception as e:
                 logger.warning(f"AI ad detection failed: {e}")
+        elif title:
+            logger.info(f"Skipping ad detection (enabled={self.enable_ad_detection})")
 
         logger.info(f"Generating summary in {language}")
 
