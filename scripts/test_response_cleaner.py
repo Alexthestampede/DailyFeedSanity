@@ -112,7 +112,27 @@ def main():
     )
     check("long ambiguous reasoning -> None", parse_yes_no(long_ambiguous), None)
 
-    # 11. Strip only (no None conversion)
+    # 11. Chatty-model sentence verdicts (Ornith style, from live test)
+    check("sentence verdict 'No, ...'", parse_yes_no(
+        "No, the article is straightforward factual reporting about Apple."), False)
+    check("sentence verdict 'Yes, ...'", parse_yes_no(
+        "Yes, this article uses sensationalized language."), True)
+    check("negation phrasing", parse_yes_no(
+        "It is not clickbait; the title matches the content."), False)
+    check("meta-commentary 'The user wants' -> reasoning", looks_like_reasoning(
+        "The user wants me to summarize this article about Apple's iPhone."), True)
+
+    # 12. Trailing narration (from live Ornith test: ends with "Let me write...")
+    live_ornith = (
+        "Key facts:\n- Apple updated iPhone 18 Pro Dynamic Island\n"
+        "- Can now show up to three Live Activities simultaneously\n\n"
+        "Let me write a professional summary."
+    )
+    check("trailing 'Let me' narration stripped", clean_response(live_ornith),
+          "Key facts:\n- Apple updated iPhone 18 Pro Dynamic Island\n"
+          "- Can now show up to three Live Activities simultaneously")
+
+    # 13. Strip only (no None conversion)
     check("strip_think_tags keeps content",
           strip_think_tags(THINK_OPEN + "x" + THINK_CLOSE + "result only"),
           "result only")
