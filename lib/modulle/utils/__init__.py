@@ -10,6 +10,7 @@ from .response_cleaner import (
     looks_like_reasoning,
     parse_yes_no,
 )
+from .json_extractor import extract_json
 
 __all__ = [
     'setup_logging',
@@ -21,4 +22,5 @@ __all__ = [
     'strip_think_tags',
     'looks_like_reasoning',
     'parse_yes_no',
+    'extract_json',
 ]

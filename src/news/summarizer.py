@@ -93,12 +93,27 @@ class NewsSummarizer:
             cleaned_title = self.cleaner.clean_title(article_data['title'])
 
             # Summarize with AI (pass language parameter)
-            summary_data = self.text_client.generate_summary(
-                text=cleaned_text,
-                title=cleaned_title,
-                author=article_data.get('author'),
-                language=language
-            )
+            # Try single-call JSON workflow first; fall back to multi-call
+            summary_data = None
+            if hasattr(self.text_client, "generate_summary_single_call"):
+                summary_data = self.text_client.generate_summary_single_call(
+                    text=cleaned_text,
+                    title=cleaned_title,
+                    author=article_data.get('author'),
+                    language=language
+                )
+                if not summary_data:
+                    logger.info(
+                        f"Single-call workflow failed for {feed_name}, "
+                        "falling back to multi-call"
+                    )
+            if not summary_data:
+                summary_data = self.text_client.generate_summary(
+                    text=cleaned_text,
+                    title=cleaned_title,
+                    author=article_data.get('author'),
+                    language=language
+                )
 
             if not summary_data:
                 logger.error(f"Failed to generate summary for {feed_name}")

@@ -17,6 +17,7 @@ from lib.modulle.utils.response_cleaner import (
     looks_like_reasoning,
     parse_yes_no,
 )
+from lib.modulle.utils.json_extractor import extract_json
 from ..utils.logging_config import get_logger
 from ..config import (
     TEXT_SUMMARY_TEMPERATURE,
@@ -279,6 +280,163 @@ class DomainTextProcessor:
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
             return None
+
+    def generate_summary_single_call(
+        self, text, title=None, author=None, language="English", max_length=500
+    ):
+        """
+        Generate summary + title + clickbait/ad verdicts in ONE AI call.
+
+        The model returns a JSON object with all fields. Falls back to None
+        when no valid JSON can be extracted (caller should skip the article).
+
+        Args:
+            text: Article text to summarize
+            title: Original article title (context for the model)
+            author: Article author (for clickbait detection)
+            language: Language to use for summary/title
+            max_length: Maximum summary length in characters
+
+        Returns:
+            dict with 'summary', 'title', 'is_clickbait', 'clickbait_detected_by',
+            'is_ad', or None on error
+        """
+        if not text or not text.strip():
+            logger.warning("Empty text provided for summarization")
+            return None
+
+        is_clickbait_author = author in CLICKBAIT_AUTHORS if author else False
+
+        ad_instruction = (
+            "Determine if it is an advertisement or sponsored content"
+            if self.enable_ad_detection
+            else None
+        )
+
+        system_prompt = self._get_single_call_prompt(language, ad_instruction)
+        user_prompt = (
+            f"Article title: {title or '(none)'}\n\n"
+            f"Article text:\n{text[:10000]}\n\n"
+            "Respond with ONLY the JSON object described in the system prompt."
+        )
+
+        try:
+            logger.info(f"Generating summary + verdicts in one call (language: {language})")
+            raw = self.processor.generate(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                temperature=TEXT_SUMMARY_TEMPERATURE,
+            )
+
+            data = extract_json(raw)
+            if not data:
+                logger.warning(
+                    f"No JSON found in response: {str(raw)[:120] if raw else '(empty)'}"
+                )
+                return None
+
+            summary = clean_response(str(data.get("summary", "")))
+            if not summary:
+                logger.error("JSON response missing usable 'summary' field")
+                return None
+
+            if looks_like_reasoning(summary):
+                logger.warning(
+                    "Summary rejected: reasoning leaked into 'summary' field "
+                    f"(starts with: {summary[:80]}...)"
+                )
+                return None
+
+            # Truncate if too long
+            if len(summary) > max_length:
+                summary = summary[:max_length].rsplit(".", 1)[0] + "."
+
+            # Title: use generated one, fall back to original
+            generated_title = clean_response(str(data.get("title", "")))
+            if not generated_title or looks_like_reasoning(generated_title):
+                generated_title = title or "Article Summary"
+            generated_title = generated_title.strip().strip("\"'")
+            if len(generated_title) > 80:
+                generated_title = generated_title[:77] + "..."
+
+            # Verdicts: booleans, default to False when missing/unclear
+            def _to_bool(value):
+                if isinstance(value, bool):
+                    return value
+                if isinstance(value, str):
+                    verdict = parse_yes_no(str(value))
+                    if verdict is not None:
+                        return verdict
+                    normalized = str(value).strip().lower()
+                    if normalized in ("true", "1"):
+                        return True
+                    if normalized in ("false", "0"):
+                        return False
+                return False
+
+            is_clickbait_ai = _to_bool(data.get("is_clickbait"))
+            is_clickbait = is_clickbait_author or is_clickbait_ai
+
+            if is_clickbait_author and is_clickbait_ai:
+                clickbait_detected_by = "both"
+            elif is_clickbait_author:
+                clickbait_detected_by = "author"
+            elif is_clickbait_ai:
+                clickbait_detected_by = "ai"
+            else:
+                clickbait_detected_by = None
+
+            is_ad = _to_bool(data.get("is_ad")) if self.enable_ad_detection else False
+
+            return {
+                "summary": summary,
+                "title": generated_title,
+                "is_clickbait": is_clickbait,
+                "clickbait_detected_by": clickbait_detected_by,
+                "is_ad": is_ad,
+            }
+
+        except Exception as e:
+            logger.error(f"Error in single-call summary: {e}")
+            return None
+
+    def _get_single_call_prompt(self, language, ad_instruction=None):
+        """
+        Get system prompt for the single-call JSON workflow.
+
+        Args:
+            language: Language for the generated summary/title
+            ad_instruction: Description of the ad-detection task, or None
+                to ask the model to always report is_ad as false
+
+        Returns:
+            System prompt string
+        """
+        ad_rule = (
+            f"- \"is_ad\": true if the article is an advertisement or sponsored "
+            f"content ({ad_instruction}), otherwise false"
+            if ad_instruction
+            else "- \"is_ad\": always false (ad detection is disabled)"
+        )
+
+        return (
+            f"Today is {self.current_date}. "
+            "You are a professional news processing assistant. "
+            "Analyze the article and respond with ONLY a JSON object, no other text, "
+            "with exactly these fields:\n"
+            "{\n"
+            "  \"title\": a clear, informative headline for the article "
+            "(max 80 characters, no clickbait language),\n"
+            "  \"summary\": an objective, factual summary of the article "
+            "(100-300 words, neutral professional tone, focus on key facts),\n"
+            "  \"is_clickbait\": true if the article title is clickbait "
+            "(sensationalized, misleading, emotional manipulation, withholding "
+            "key information), otherwise false,\n"
+            f"{ad_rule}\n"
+            "}\n"
+            f"Write \"title\" and \"summary\" in {language}. "
+            "Output raw JSON only - no markdown fences, no explanations."
+        )
 
     def generate_title(self, summary, language="English"):
         """

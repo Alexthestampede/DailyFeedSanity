@@ -61,10 +61,15 @@ def main():
     # 4. Build domain processor against remote server
     class RemoteTextProcessor:
         def generate(self, prompt, system_prompt=None, temperature=0.7, max_tokens=None):
-            raw = client.generate(
+            # Use the chat endpoint: with this model, /api/generate truncates
+            # mid-response and gets chatty, while /api/chat returns clean JSON
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+            raw = client.chat(
                 model=MODEL,
-                prompt=prompt,
-                system=system_prompt,
+                messages=messages,
                 temperature=temperature,
             )
             if raw:
@@ -76,27 +81,26 @@ def main():
     RemoteTextProcessor.n = 1
     proc = DomainTextProcessor(RemoteTextProcessor())
 
-    # 5. Run detection + summary
-    print("\n--- Clickbait detection ---")
-    is_clickbait = proc.detect_clickbait(cleaned[:500], cleaned)
-    print(f"Result: {is_clickbait}")
-
-    print("\n--- Ad detection ---")
-    is_ad = proc.detect_ad(cleaned[:500], cleaned)
-    print(f"Result: {is_ad}")
-
-    print("\n--- Summary ---")
-    result = proc.generate_summary(cleaned, title=article.get("title"))
+    # 5. Run single-call workflow (summary + title + verdicts in ONE call)
+    print("\n--- Single-call JSON workflow ---")
+    result = proc.generate_summary_single_call(cleaned, title=article.get("title"))
 
     if result is None:
-        print("FAIL: generate_summary returned None (response rejected)")
+        print("FAIL: generate_summary_single_call returned None (no JSON)")
         return 1
 
     print(f"Title: {result['title']}")
     print(f"Summary ({len(result['summary'])} chars): {result['summary']}")
-    print(f"clickbait={result['is_clickbait']}, ad={result['is_ad']}")
+    print(f"clickbait={result['is_clickbait']} ({result['clickbait_detected_by']}), ad={result['is_ad']}")
 
-    # 6. Verdict: check for reasoning leakage
+    # 6. Compare with the old multi-call path for reference
+    print("\n--- Old multi-call path (for comparison) ---")
+    old = proc.generate_summary(cleaned, title=article.get("title"))
+    if old:
+        print(f"Old path used {RemoteTextProcessor.n} total calls so far")
+        print(f"Old title: {old['title'][:60]}")
+
+    # 7. Verdict: check for reasoning leakage
     print("\n" + "=" * 70)
     summary = result["summary"]
     title = result["title"]
