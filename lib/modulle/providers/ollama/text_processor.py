@@ -43,6 +43,11 @@ class OllamaTextProcessor(BaseTextProcessor):
         """
         Generate text from a prompt using Ollama.
 
+        Routed through the chat API: with chat-template models (Ornith,
+        Qwen3, Nemotron, etc.) /api/generate can truncate mid-response and
+        produce chatty output, while /api/chat applies the proper template
+        and returns clean responses.
+
         This is the primary method for all text generation tasks.
         Applications build their logic by crafting appropriate prompts.
 
@@ -56,10 +61,14 @@ class OllamaTextProcessor(BaseTextProcessor):
             Generated text string, or None on error
         """
         try:
-            response = self.client.generate(
+            messages = []
+            if system_prompt:
+                messages.append({"role": "system", "content": system_prompt})
+            messages.append({"role": "user", "content": prompt})
+
+            response = self.client.chat(
                 model=self.model,
-                prompt=prompt,
-                system=system_prompt,
+                messages=messages,
                 temperature=temperature
             )
 

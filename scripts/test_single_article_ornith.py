@@ -58,28 +58,12 @@ def main():
         print(f"FAIL: content invalid: {validation.get('reason')}")
         return 1
 
-    # 4. Build domain processor against remote server
-    class RemoteTextProcessor:
-        def generate(self, prompt, system_prompt=None, temperature=0.7, max_tokens=None):
-            # Use the chat endpoint: with this model, /api/generate truncates
-            # mid-response and gets chatty, while /api/chat returns clean JSON
-            messages = []
-            if system_prompt:
-                messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
-            raw = client.chat(
-                model=MODEL,
-                messages=messages,
-                temperature=temperature,
-            )
-            if raw:
-                print(f"    [model call #{RemoteTextProcessor.n}] raw len={len(raw)}, "
-                      f"starts: {raw[:60]!r}")
-                RemoteTextProcessor.n += 1
-            return raw
+    # 4. Build domain processor using the REAL ModuLLe Ollama text processor
+    # (generate() now routes through the chat endpoint)
+    from lib.modulle.providers.ollama.text_processor import OllamaTextProcessor
 
-    RemoteTextProcessor.n = 1
-    proc = DomainTextProcessor(RemoteTextProcessor())
+    text_proc = OllamaTextProcessor(model=MODEL, base_url=BASE_URL)
+    proc = DomainTextProcessor(text_proc)
 
     # 5. Run single-call workflow (summary + title + verdicts in ONE call)
     print("\n--- Single-call JSON workflow ---")
@@ -97,8 +81,8 @@ def main():
     print("\n--- Old multi-call path (for comparison) ---")
     old = proc.generate_summary(cleaned, title=article.get("title"))
     if old:
-        print(f"Old path used {RemoteTextProcessor.n} total calls so far")
         print(f"Old title: {old['title'][:60]}")
+        print(f"Old verdicts: clickbait={old['is_clickbait']}, ad={old['is_ad']}")
 
     # 7. Verdict: check for reasoning leakage
     print("\n" + "=" * 70)
