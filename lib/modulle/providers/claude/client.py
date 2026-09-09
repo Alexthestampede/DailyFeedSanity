@@ -7,6 +7,7 @@ Messages API format.
 import requests
 from typing import Optional, List, Dict, Any
 from ...utils.logging_config import get_logger
+from ...utils.response_cleaner import clean_response
 from ...config import REQUEST_TIMEOUT
 from ...base import BaseAIClient
 
@@ -138,7 +139,7 @@ class ClaudeClient(BaseAIClient):
 
             # Extract text from response
             if 'content' in data and len(data['content']) > 0:
-                return data['content'][0].get('text', '')
+                return clean_response(data['content'][0].get('text', ''))
 
             logger.error("Unexpected Claude response format")
             return None
@@ -203,7 +204,7 @@ class ClaudeClient(BaseAIClient):
 
             # Extract text from response
             if 'content' in data and len(data['content']) > 0:
-                return data['content'][0].get('text', '')
+                return clean_response(data['content'][0].get('text', ''))
 
             logger.error("Unexpected Claude response format")
             return None

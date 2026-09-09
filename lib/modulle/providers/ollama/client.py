@@ -5,6 +5,7 @@ import json
 import requests
 from typing import List, Dict, Any, Optional
 from ...utils.logging_config import get_logger
+from ...utils.response_cleaner import clean_response
 from ...config import OLLAMA_BASE_URL, REQUEST_TIMEOUT
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
@@ -107,9 +108,9 @@ class OllamaClient:
                 return None
 
             data = response.json()
-            generated_text = data.get('response', '').strip()
+            generated_text = clean_response(data.get('response', ''))
 
-            logger.debug(f"Generated {len(generated_text)} characters")
+            logger.debug(f"Generated {len(generated_text or '')} characters")
             return generated_text
 
         except requests.exceptions.RequestException as e:
@@ -160,9 +161,9 @@ class OllamaClient:
 
             data = response.json()
             message = data.get('message', {})
-            content = message.get('content', '').strip()
+            content = clean_response(message.get('content', ''))
 
-            logger.debug(f"Generated {len(content)} characters")
+            logger.debug(f"Generated {len(content or '')} characters")
             return content
 
         except requests.exceptions.RequestException as e:

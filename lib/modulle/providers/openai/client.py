@@ -8,6 +8,7 @@ import os
 import requests
 from typing import Optional, List, Dict, Any
 from ...utils.logging_config import get_logger
+from ...utils.response_cleaner import clean_response
 from ...config import REQUEST_TIMEOUT
 from ...base import BaseAIClient
 
@@ -308,7 +309,7 @@ class OpenAIClient(BaseAIClient):
 
             choice = data['choices'][0]
             message = choice['message']
-            content = message.get('content', '')
+            content = clean_response(message.get('content', ''))
             finish_reason = choice.get('finish_reason', 'stop')
 
             # Parse tool calls

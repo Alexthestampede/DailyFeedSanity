@@ -12,6 +12,11 @@ All methods build domain prompts and delegate to ModuLLe's generate().
 
 from datetime import datetime
 from typing import Optional, Dict, Any
+from lib.modulle.utils.response_cleaner import (
+    clean_response,
+    looks_like_reasoning,
+    parse_yes_no,
+)
 from ..utils.logging_config import get_logger
 from ..config import (
     TEXT_SUMMARY_TEMPERATURE,
@@ -19,7 +24,6 @@ from ..config import (
     CLICKBAIT_DETECTION_TEMPERATURE,
     CLICKBAIT_AUTHORS,
     AD_DETECTION_TEMPERATURE,
-    ENABLE_AD_DETECTION,
 )
 
 logger = get_logger(__name__)
@@ -108,15 +112,15 @@ class DomainTextProcessor:
                 temperature=CLICKBAIT_DETECTION_TEMPERATURE,
             )
 
-            if not response:
-                logger.warning("Empty response from clickbait detection")
+            verdict = parse_yes_no(response)
+
+            if verdict is None:
+                logger.warning(f"Unclear clickbait detection response: {str(response)[:100] if response else '(empty)'}")
                 return False
 
-            response_lower = response.strip().lower()
-            if "yes" in response_lower:
+            if verdict:
                 logger.info(f"AI detected clickbait: {title[:50]}...")
-                return True
-            return False
+            return verdict
 
         except Exception as e:
             logger.error(f"Error in clickbait detection: {e}")
@@ -161,15 +165,15 @@ class DomainTextProcessor:
                 temperature=AD_DETECTION_TEMPERATURE,
             )
 
-            if not response:
-                logger.warning("Empty response from ad detection")
+            verdict = parse_yes_no(response)
+
+            if verdict is None:
+                logger.warning(f"Unclear ad detection response: {str(response)[:100] if response else '(empty)'}")
                 return False
 
-            response_lower = response.strip().lower()
-            if "yes" in response_lower:
+            if verdict:
                 logger.info(f"AI detected ad/sponsored content: {title[:50]}...")
-                return True
-            return False
+            return verdict
 
         except Exception as e:
             logger.error(f"Error in ad detection: {e}")
@@ -241,8 +245,20 @@ class DomainTextProcessor:
                 temperature=TEXT_SUMMARY_TEMPERATURE,
             )
 
+            # Strip reasoning traces (also salvages answer after reasoning)
+            summary = clean_response(summary)
+
             if not summary:
                 logger.error("Failed to generate summary")
+                return None
+
+            # Safety net: reject responses that still look like reasoning
+            # (e.g. thinking models with missing tags)
+            if looks_like_reasoning(summary):
+                logger.warning(
+                    "Summary rejected: response contains chain-of-thought reasoning "
+                    f"(starts with: {summary[:80]}...)"
+                )
                 return None
 
             # Truncate if too long
@@ -293,7 +309,9 @@ class DomainTextProcessor:
                 temperature=TEXT_TITLE_TEMPERATURE,
             )
 
-            if not title:
+            title = clean_response(title)
+
+            if not title or looks_like_reasoning(title):
                 return "Article Summary"
 
             title = title.strip().strip("\"'")

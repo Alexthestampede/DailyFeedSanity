@@ -7,6 +7,7 @@ generativelanguage.googleapis.com endpoint.
 import requests
 from typing import Optional, List, Dict, Any
 from ...utils.logging_config import get_logger
+from ...utils.response_cleaner import clean_response
 from ...config import REQUEST_TIMEOUT
 from ...base import BaseAIClient
 
@@ -126,7 +127,7 @@ class GeminiClient(BaseAIClient):
                 if 'content' in candidate and 'parts' in candidate['content']:
                     parts = candidate['content']['parts']
                     if len(parts) > 0 and 'text' in parts[0]:
-                        return parts[0]['text']
+                        return clean_response(parts[0]['text'])
 
             logger.error("Unexpected Gemini response format")
             return None
@@ -197,7 +198,7 @@ class GeminiClient(BaseAIClient):
                 if 'content' in candidate and 'parts' in candidate['content']:
                     parts = candidate['content']['parts']
                     if len(parts) > 0 and 'text' in parts[0]:
-                        return parts[0]['text']
+                        return clean_response(parts[0]['text'])
 
             logger.error("Unexpected Gemini response format")
             return None
