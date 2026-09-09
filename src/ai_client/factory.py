@@ -156,9 +156,21 @@ def create_ai_client() -> Tuple[
     user_config = _load_user_config()
     resolved = _resolve_provider_config(user_config)
 
+    request_timeout = user_config.get("request_timeout") if user_config else None
+    if request_timeout:
+        try:
+            request_timeout = int(request_timeout)
+        except (TypeError, ValueError):
+            logger.warning(f"Invalid request_timeout in config: {request_timeout!r}, using default")
+            request_timeout = None
+        if request_timeout is not None and request_timeout <= 0:
+            logger.warning(f"request_timeout must be positive: {request_timeout}, using default")
+            request_timeout = None
+
     logger.info(
         f"Creating AI client - Provider: {resolved['provider']}, "
         f"Text: {resolved['text_model']}, Vision: {resolved['vision_model']}"
+        + (f", Timeout: {request_timeout}s" if request_timeout else "")
     )
 
     # Create generic ModuLLe client + processors
@@ -168,6 +180,7 @@ def create_ai_client() -> Tuple[
         vision_model=resolved.get("vision_model"),
         base_url=resolved.get("base_url"),
         api_key=resolved.get("api_key"),
+        request_timeout=request_timeout,
     )
 
     # Wrap in domain-specific processors
@@ -213,11 +226,18 @@ def create_ai_client_with_fallback() -> Tuple[
             try:
                 from lib.modulle import create_ai_client as modulle_create
 
+                request_timeout = (
+                    int(user_config["request_timeout"])
+                    if user_config and user_config.get("request_timeout")
+                    else None
+                )
+
                 client, text_proc, vision_proc = modulle_create(
                     provider="ollama",
                     text_model=app_config.TEXT_MODEL,
                     vision_model=app_config.VISION_MODEL,
                     base_url=app_config.OLLAMA_BASE_URL,
+                    request_timeout=request_timeout,
                 )
 
                 domain_text = DomainTextProcessor(

@@ -22,19 +22,21 @@ class GeminiClient(BaseAIClient):
     structure instead of messages.
     """
 
-    def __init__(self, api_key: str, base_url: str = "https://generativelanguage.googleapis.com/v1beta"):
+    def __init__(self, api_key: str, base_url: str = "https://generativelanguage.googleapis.com/v1beta", request_timeout=None):
         """
         Initialize Gemini client.
 
         Args:
             api_key: Google API key for Gemini
             base_url: Gemini API base URL
+            request_timeout: Timeout in seconds for API requests (optional, uses config default)
         """
         if not api_key:
             raise ValueError("Gemini API key is required. Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.")
 
         self.api_key = api_key
         self.base_url = base_url.rstrip('/')
+        self.request_timeout = request_timeout or REQUEST_TIMEOUT
 
     def health_check(self) -> bool:
         """
@@ -64,7 +66,7 @@ class GeminiClient(BaseAIClient):
             url = f"{self.base_url}/models"
             params = {"key": self.api_key}
 
-            response = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
+            response = requests.get(url, params=params, timeout=self.request_timeout)
             response.raise_for_status()
 
             data = response.json()
@@ -116,7 +118,7 @@ class GeminiClient(BaseAIClient):
                     "parts": [{"text": system}]
                 }
 
-            response = requests.post(url, params=params, json=payload, timeout=REQUEST_TIMEOUT)
+            response = requests.post(url, params=params, json=payload, timeout=self.request_timeout)
             response.raise_for_status()
 
             data = response.json()
@@ -187,7 +189,7 @@ class GeminiClient(BaseAIClient):
             if system_instruction:
                 payload["systemInstruction"] = system_instruction
 
-            response = requests.post(url, params=params, json=payload, timeout=REQUEST_TIMEOUT)
+            response = requests.post(url, params=params, json=payload, timeout=self.request_timeout)
             response.raise_for_status()
 
             data = response.json()
@@ -318,7 +320,7 @@ class GeminiClient(BaseAIClient):
             logger.debug(f"Sending chat with tools request to Gemini model: {model}")
             logger.debug(f"Available tools: {[t['name'] for t in tools]}")
 
-            response = requests.post(url, params=params, json=payload, timeout=REQUEST_TIMEOUT * 3)
+            response = requests.post(url, params=params, json=payload, timeout=self.request_timeout * 3)
             response.raise_for_status()
 
             data = response.json()
@@ -422,7 +424,7 @@ class GeminiClient(BaseAIClient):
                     "parts": [{"text": system}]
                 }
 
-            response = requests.post(url, params=params, json=payload, timeout=REQUEST_TIMEOUT * 2)
+            response = requests.post(url, params=params, json=payload, timeout=self.request_timeout * 2)
             response.raise_for_status()
 
             data = response.json()

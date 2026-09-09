@@ -1,10 +1,12 @@
 """
 HTTP client utilities for RSS Feed Processor
 """
+import json
 import time
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
+from pathlib import Path
 from .logging_config import get_logger
 from ..config import (
     USER_AGENT,
@@ -15,6 +17,30 @@ from ..config import (
 )
 
 logger = get_logger(__name__)
+
+_CONFIG_FILE = Path(__file__).parent.parent.parent / '.config.json'
+
+
+def get_configured_request_timeout():
+    """
+    Get the user-configured request timeout from .config.json.
+
+    Returns:
+        Timeout in seconds (falls back to src config default)
+    """
+    try:
+        if _CONFIG_FILE.exists():
+            with open(_CONFIG_FILE, 'r') as f:
+                config = json.load(f)
+            value = config.get('request_timeout')
+            if value is not None:
+                timeout = int(value)
+                if timeout > 0:
+                    return timeout
+                logger.warning(f"Invalid request_timeout in config: {value}, using default")
+    except (json.JSONDecodeError, OSError, TypeError, ValueError) as e:
+        logger.warning(f"Could not load request_timeout from config: {e}")
+    return REQUEST_TIMEOUT
 
 
 def create_session(max_retries=MAX_RETRIES):
@@ -53,7 +79,7 @@ def create_session(max_retries=MAX_RETRIES):
     return session
 
 
-def fetch_url(url, session=None, timeout=REQUEST_TIMEOUT, **kwargs):
+def fetch_url(url, session=None, timeout=None, **kwargs):
     """
     Fetch a URL with retry logic and error handling.
 
@@ -71,6 +97,9 @@ def fetch_url(url, session=None, timeout=REQUEST_TIMEOUT, **kwargs):
     """
     if session is None:
         session = create_session()
+
+    if timeout is None:
+        timeout = get_configured_request_timeout()
 
     attempt = 0
     last_exception = None
@@ -97,7 +126,7 @@ def fetch_url(url, session=None, timeout=REQUEST_TIMEOUT, **kwargs):
     raise last_exception
 
 
-def download_file(url, output_path, session=None, timeout=REQUEST_TIMEOUT):
+def download_file(url, output_path, session=None, timeout=None, **kwargs):
     """
     Download a file from URL and save to disk.
 
@@ -144,7 +173,7 @@ def fetch_with_custom_retry(url, retry_count=3, delay=2, session=None):
 
     for attempt in range(retry_count):
         try:
-            response = session.get(url, timeout=REQUEST_TIMEOUT)
+            response = session.get(url, timeout=get_configured_request_timeout())
             response.raise_for_status()
             return response
 

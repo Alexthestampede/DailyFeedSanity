@@ -23,7 +23,7 @@ class OpenAIClient(BaseAIClient):
     AI providers.
     """
 
-    def __init__(self, api_key: Optional[str] = None, base_url: str = "https://api.openai.com/v1"):
+    def __init__(self, api_key: Optional[str] = None, base_url: str = "https://api.openai.com/v1", request_timeout=None):
         """
         Initialize OpenAI client.
 
@@ -46,6 +46,7 @@ class OpenAIClient(BaseAIClient):
             raise ValueError(error_msg)
 
         self.base_url = base_url.rstrip('/')
+        self.request_timeout = request_timeout or REQUEST_TIMEOUT
         self.headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
@@ -94,7 +95,7 @@ class OpenAIClient(BaseAIClient):
             response = requests.get(
                 f"{self.base_url}/models",
                 headers=self.headers,
-                timeout=REQUEST_TIMEOUT
+                timeout=self.request_timeout
             )
             response.raise_for_status()
 
@@ -186,7 +187,7 @@ class OpenAIClient(BaseAIClient):
                 f"{self.base_url}/chat/completions",
                 headers=self.headers,
                 json=payload,
-                timeout=REQUEST_TIMEOUT * 3  # Longer timeout for generation
+                timeout=self.request_timeout * 3  # Generation needs longer than health calls
             )
 
             # Handle rate limiting
@@ -213,7 +214,7 @@ class OpenAIClient(BaseAIClient):
                 return None
 
         except requests.exceptions.Timeout:
-            logger.error(f"OpenAI request timeout after {REQUEST_TIMEOUT * 3} seconds")
+            logger.error(f"OpenAI request timeout after {self.request_timeout * 3} seconds")
             return None
         except requests.exceptions.RequestException as e:
             logger.error(f"OpenAI chat request failed: {e}")
@@ -272,7 +273,7 @@ class OpenAIClient(BaseAIClient):
                 f"{self.base_url}/chat/completions",
                 headers=self.headers,
                 json=payload,
-                timeout=REQUEST_TIMEOUT * 3
+                timeout=self.request_timeout * 3
             )
 
             # Handle errors
@@ -344,7 +345,7 @@ class OpenAIClient(BaseAIClient):
             }
 
         except requests.exceptions.Timeout:
-            logger.error(f"OpenAI request timeout after {REQUEST_TIMEOUT * 3} seconds")
+            logger.error(f"OpenAI request timeout after {self.request_timeout * 3} seconds")
             return {
                 'content': None,
                 'tool_calls': [],

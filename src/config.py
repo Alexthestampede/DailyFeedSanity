@@ -116,14 +116,14 @@ CLICKBAIT_AUTHORS = ["Francesca Testa"]
 
 # HTTP Settings
 USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-REQUEST_TIMEOUT = 30  # seconds
+REQUEST_TIMEOUT = 30  # seconds (default; overridden by request_timeout in .config.json)
 MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds
 RETRY_BACKOFF = 2  # exponential backoff multiplier
 
 # Concurrency Settings
 MAX_CONCURRENT_FEEDS = 10
-FEED_TIMEOUT = 120  # seconds per feed
+FEED_TIMEOUT = 120  # seconds per feed (independent of request_timeout)
 
 # Time Filtering
 TIME_FILTER_HOURS = (

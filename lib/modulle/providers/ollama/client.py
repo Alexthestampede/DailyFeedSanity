@@ -16,15 +16,18 @@ class OllamaClient:
     Base client for interacting with Ollama API.
     """
 
-    def __init__(self, base_url=OLLAMA_BASE_URL):
+    def __init__(self, base_url=OLLAMA_BASE_URL, request_timeout=None):
         """
         Initialize Ollama client.
 
         Args:
             base_url: Ollama server base URL
+            request_timeout: Timeout in seconds for API requests.
+                Generation calls use 3x this value. Defaults to config.
         """
         self.base_url = base_url.rstrip('/')
         self.api_url = f"{self.base_url}/api"
+        self.request_timeout = request_timeout or REQUEST_TIMEOUT
 
     def health_check(self):
         """
@@ -50,7 +53,7 @@ class OllamaClient:
             List of model names, or empty list on error
         """
         try:
-            response = requests.get(f"{self.api_url}/tags", timeout=REQUEST_TIMEOUT)
+            response = requests.get(f"{self.api_url}/tags", timeout=self.request_timeout)
             response.raise_for_status()
             data = response.json()
             models = [model['name'] for model in data.get('models', [])]
@@ -94,7 +97,7 @@ class OllamaClient:
             response = requests.post(
                 f"{self.api_url}/generate",
                 json=payload,
-                timeout=REQUEST_TIMEOUT * 3  # Longer timeout for generation
+                timeout=self.request_timeout * 3  # Generation needs longer than health/list calls
             )
 
             # Check for errors and try to get detailed error message from Ollama
@@ -146,7 +149,7 @@ class OllamaClient:
             response = requests.post(
                 f"{self.api_url}/chat",
                 json=payload,
-                timeout=REQUEST_TIMEOUT * 3
+                timeout=self.request_timeout * 3
             )
 
             # Check for errors and try to get detailed error message from Ollama
@@ -225,7 +228,7 @@ class OllamaClient:
             response = requests.post(
                 f"{self.api_url}/chat",
                 json=payload,
-                timeout=REQUEST_TIMEOUT * 3
+                timeout=self.request_timeout * 3
             )
 
             # Check for errors

@@ -1066,6 +1066,8 @@ def display_config_summary(config: Dict):
 
     print(f"Text Model: {config.get('text_model', 'Not configured')}")
     print(f"Vision Model: {config.get('vision_model', 'Not configured (optional)')}")
+    print(f"Request Timeout: {config.get('request_timeout', 30)}s "
+          f"(AI generation: {config.get('request_timeout', 30) * 3}s)")
 
     feed_count = len(config.get("rss_feeds", []))
     print(f"RSS Feeds: {feed_count} configured")
@@ -1237,10 +1239,11 @@ def interactive_menu(config: Dict):
         print(" [12] Clear language cache")
         print(" [13] Check for updates")
         print(" [14] Toggle ad detection")
-        print(" [15] Exit")
+        print(" [15] Set request timeout")
+        print(" [16] Exit")
         print()
 
-        choice = input("Select option [1-15]: ").strip()
+        choice = input("Select option [1-16]: ").strip()
 
         if choice == "1":
             # Change AI provider (requires full reconfiguration)
@@ -1408,12 +1411,36 @@ def interactive_menu(config: Dict):
             input("Press Enter to continue...")
 
         elif choice == "15":
+            # Set request timeout
+            current = config.get("request_timeout", 30)
+            print(f"\nCurrent request timeout: {current}s "
+                  f"(AI generation calls use 3x = {current * 3}s)")
+            print("Raise this for large/slow local models (e.g. 300 for 27B models).")
+            print("Lower it for fast cloud APIs to fail faster on outages.")
+            response = get_input(
+                "Enter timeout in seconds",
+                default=str(current),
+            )
+            try:
+                new_timeout = int(response)
+                if new_timeout <= 0:
+                    print("Timeout must be a positive number of seconds.")
+                else:
+                    config["request_timeout"] = new_timeout
+                    save_config(config)
+                    print(f"\nRequest timeout set to {new_timeout}s "
+                          f"(AI generation: {new_timeout * 3}s)!")
+            except ValueError:
+                print(f"Invalid number: {response}")
+            input("Press Enter to continue...")
+
+        elif choice == "16":
             # Exit
             print("\nExiting configuration wizard.")
             break
 
         else:
-            print("\nInvalid option. Please select 1-15.")
+            print("\nInvalid option. Please select 1-16.")
             input("Press Enter to continue...")
 
 
@@ -1469,6 +1496,7 @@ def first_run_setup() -> Optional[Dict]:
 
     # Feature toggles - set defaults
     config["enable_ad_detection"] = True  # Ad detection enabled by default
+    config["request_timeout"] = 30  # Seconds; AI generation uses 3x this value
 
     # Save configuration
     if save_config(config):
