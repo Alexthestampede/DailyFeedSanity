@@ -6,10 +6,9 @@ Messages API format.
 """
 import requests
 from typing import Optional, List, Dict, Any
-from ...utils.logging_config import get_logger
-from ...utils.response_cleaner import clean_response
-from ...config import REQUEST_TIMEOUT
-from ...base import BaseAIClient
+from modulle.utils.logging_config import get_logger
+from modulle.config import REQUEST_TIMEOUT
+from modulle.base import BaseAIClient
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
 
@@ -23,14 +22,13 @@ class ClaudeClient(BaseAIClient):
 
     API_VERSION = "2023-06-01"
 
-    def __init__(self, api_key: str, base_url: str = "https://api.anthropic.com/v1", request_timeout=None):
+    def __init__(self, api_key: str, base_url: str = "https://api.anthropic.com/v1", request_timeout: Optional[int] = None):
         """
         Initialize Claude client.
 
         Args:
             api_key: Anthropic API key
             base_url: Claude API base URL
-            request_timeout: Timeout in seconds for API requests (optional, uses config default)
         """
         if not api_key:
             raise ValueError("Anthropic API key is required. Set ANTHROPIC_API_KEY environment variable.")
@@ -141,7 +139,7 @@ class ClaudeClient(BaseAIClient):
 
             # Extract text from response
             if 'content' in data and len(data['content']) > 0:
-                return clean_response(data['content'][0].get('text', ''))
+                return data['content'][0].get('text', '')
 
             logger.error("Unexpected Claude response format")
             return None
@@ -206,7 +204,7 @@ class ClaudeClient(BaseAIClient):
 
             # Extract text from response
             if 'content' in data and len(data['content']) > 0:
-                return clean_response(data['content'][0].get('text', ''))
+                return data['content'][0].get('text', '')
 
             logger.error("Unexpected Claude response format")
             return None

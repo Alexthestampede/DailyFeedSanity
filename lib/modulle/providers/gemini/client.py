@@ -6,10 +6,9 @@ generativelanguage.googleapis.com endpoint.
 """
 import requests
 from typing import Optional, List, Dict, Any
-from ...utils.logging_config import get_logger
-from ...utils.response_cleaner import clean_response
-from ...config import REQUEST_TIMEOUT
-from ...base import BaseAIClient
+from modulle.utils.logging_config import get_logger
+from modulle.config import REQUEST_TIMEOUT
+from modulle.base import BaseAIClient
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
 
@@ -22,14 +21,13 @@ class GeminiClient(BaseAIClient):
     structure instead of messages.
     """
 
-    def __init__(self, api_key: str, base_url: str = "https://generativelanguage.googleapis.com/v1beta", request_timeout=None):
+    def __init__(self, api_key: str, base_url: str = "https://generativelanguage.googleapis.com/v1beta", request_timeout: Optional[int] = None):
         """
         Initialize Gemini client.
 
         Args:
             api_key: Google API key for Gemini
             base_url: Gemini API base URL
-            request_timeout: Timeout in seconds for API requests (optional, uses config default)
         """
         if not api_key:
             raise ValueError("Gemini API key is required. Set GEMINI_API_KEY or GOOGLE_API_KEY environment variable.")
@@ -129,7 +127,7 @@ class GeminiClient(BaseAIClient):
                 if 'content' in candidate and 'parts' in candidate['content']:
                     parts = candidate['content']['parts']
                     if len(parts) > 0 and 'text' in parts[0]:
-                        return clean_response(parts[0]['text'])
+                        return parts[0]['text']
 
             logger.error("Unexpected Gemini response format")
             return None
@@ -200,7 +198,7 @@ class GeminiClient(BaseAIClient):
                 if 'content' in candidate and 'parts' in candidate['content']:
                     parts = candidate['content']['parts']
                     if len(parts) > 0 and 'text' in parts[0]:
-                        return clean_response(parts[0]['text'])
+                        return parts[0]['text']
 
             logger.error("Unexpected Gemini response format")
             return None

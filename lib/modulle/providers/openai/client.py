@@ -7,10 +7,9 @@ and vision capabilities using GPT-4 and GPT-3.5-turbo models.
 import os
 import requests
 from typing import Optional, List, Dict, Any
-from ...utils.logging_config import get_logger
-from ...utils.response_cleaner import clean_response
-from ...config import REQUEST_TIMEOUT
-from ...base import BaseAIClient
+from modulle.utils.logging_config import get_logger
+from modulle.config import REQUEST_TIMEOUT
+from modulle.base import BaseAIClient
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
 
@@ -23,7 +22,7 @@ class OpenAIClient(BaseAIClient):
     AI providers.
     """
 
-    def __init__(self, api_key: Optional[str] = None, base_url: str = "https://api.openai.com/v1", request_timeout=None):
+    def __init__(self, api_key: Optional[str] = None, base_url: str = "https://api.openai.com/v1", request_timeout: Optional[int] = None):
         """
         Initialize OpenAI client.
 
@@ -95,7 +94,7 @@ class OpenAIClient(BaseAIClient):
             response = requests.get(
                 f"{self.base_url}/models",
                 headers=self.headers,
-                timeout=self.request_timeout
+                timeout=REQUEST_TIMEOUT
             )
             response.raise_for_status()
 
@@ -187,7 +186,7 @@ class OpenAIClient(BaseAIClient):
                 f"{self.base_url}/chat/completions",
                 headers=self.headers,
                 json=payload,
-                timeout=self.request_timeout * 3  # Generation needs longer than health calls
+                timeout=self.request_timeout * 3  # Longer timeout for generation
             )
 
             # Handle rate limiting
@@ -214,7 +213,7 @@ class OpenAIClient(BaseAIClient):
                 return None
 
         except requests.exceptions.Timeout:
-            logger.error(f"OpenAI request timeout after {self.request_timeout * 3} seconds")
+            logger.error(f"OpenAI request timeout after {REQUEST_TIMEOUT * 3} seconds")
             return None
         except requests.exceptions.RequestException as e:
             logger.error(f"OpenAI chat request failed: {e}")
@@ -310,7 +309,7 @@ class OpenAIClient(BaseAIClient):
 
             choice = data['choices'][0]
             message = choice['message']
-            content = clean_response(message.get('content', ''))
+            content = message.get('content', '')
             finish_reason = choice.get('finish_reason', 'stop')
 
             # Parse tool calls
@@ -345,7 +344,7 @@ class OpenAIClient(BaseAIClient):
             }
 
         except requests.exceptions.Timeout:
-            logger.error(f"OpenAI request timeout after {self.request_timeout * 3} seconds")
+            logger.error(f"OpenAI request timeout after {REQUEST_TIMEOUT * 3} seconds")
             return {
                 'content': None,
                 'tool_calls': [],

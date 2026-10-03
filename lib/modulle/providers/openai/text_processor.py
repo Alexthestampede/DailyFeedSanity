@@ -6,9 +6,9 @@ All application logic should be built on top of this generic interface.
 """
 from typing import Optional, List, Dict, Any
 from .client import OpenAIClient
-from ...utils.logging_config import get_logger
-from ...config import DEFAULT_TEMPERATURE
-from ...base import BaseTextProcessor
+from modulle.utils.logging_config import get_logger
+from modulle.config import DEFAULT_TEMPERATURE
+from modulle.base import BaseTextProcessor
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
 
@@ -21,7 +21,7 @@ class OpenAITextProcessor(BaseTextProcessor):
     Applications build domain-specific logic by crafting prompts.
     """
 
-    def __init__(self, model: str, api_key: Optional[str] = None, request_timeout=None):
+    def __init__(self, model: str, api_key: Optional[str] = None, request_timeout: Optional[int] = None):
         """
         Initialize OpenAI text processor.
 

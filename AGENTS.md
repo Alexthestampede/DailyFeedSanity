@@ -89,6 +89,9 @@ def process_feed(url: str, timeout: int = 30) -> Optional[Dict[str, Any]]:
 - Use pytest for test execution
 - Follow existing patterns in test files
 - Test files named `test_*.py` or `*_test.py`
+- Keep live test runs small: max 5 articles when testing against a real feed
+  (e.g. `--feeds <file>` + `--all-entries` on a small trimmed feed list, or
+  interrupt after a few). Never run 59-article batches for testing.
 
 ## Project Structure
 

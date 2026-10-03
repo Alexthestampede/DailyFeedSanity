@@ -6,10 +6,9 @@ OpenAI chat completions format for all operations.
 """
 import requests
 from typing import Optional, List, Dict
-from ...utils.logging_config import get_logger
-from ...utils.response_cleaner import clean_response
-from ...config import LM_STUDIO_BASE_URL, REQUEST_TIMEOUT
-from ...base import BaseAIClient
+from modulle.utils.logging_config import get_logger
+from modulle.config import LM_STUDIO_BASE_URL, REQUEST_TIMEOUT
+from modulle.base import BaseAIClient
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
 
@@ -22,14 +21,13 @@ class LMStudioClient(BaseAIClient):
     the /v1/chat/completions endpoint.
     """
 
-    def __init__(self, base_url=LM_STUDIO_BASE_URL, request_timeout=None):
+    def __init__(self, base_url=LM_STUDIO_BASE_URL, request_timeout: Optional[int] = None):
         """
         Initialize LM Studio client.
 
         Args:
             base_url: LM Studio server base URL
-            request_timeout: Timeout in seconds for API requests.
-                Generation calls use 3x this value. Defaults to config.
+            request_timeout: Timeout in seconds for API requests (optional, uses config default)
         """
         self.base_url = base_url.rstrip('/')
         self.api_url = f"{self.base_url}/v1"
@@ -164,7 +162,7 @@ class LMStudioClient(BaseAIClient):
             response = requests.post(
                 f"{self.api_url}/chat/completions",
                 json=payload,
-                timeout=self.request_timeout * 3  # Generation needs longer than health calls
+                timeout=self.request_timeout * 3  # Longer timeout for generation
             )
             response.raise_for_status()
 
@@ -176,9 +174,9 @@ class LMStudioClient(BaseAIClient):
                 logger.error("No choices in LM Studio response")
                 return None
 
-            content = clean_response(choices[0].get('message', {}).get('content', ''))
+            content = choices[0].get('message', {}).get('content', '').strip()
 
-            logger.debug(f"Generated {len(content or '')} characters")
+            logger.debug(f"Generated {len(content)} characters")
             return content
 
         except requests.exceptions.RequestException as e:
@@ -255,7 +253,7 @@ class LMStudioClient(BaseAIClient):
 
             choice = choices[0]
             message = choice.get('message', {})
-            content = clean_response(message.get('content', ''))
+            content = message.get('content', '')
             finish_reason = choice.get('finish_reason', 'stop')
 
             # Parse tool calls (OpenAI format)

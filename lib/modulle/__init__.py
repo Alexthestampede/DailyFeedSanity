@@ -23,7 +23,7 @@ Example usage:
     )
 """
 
-__version__ = "0.2.0"
+__version__ = "0.1.0"
 __author__ = "Extracted from DailyFeedSanity"
 
 from .base import BaseAIClient, BaseTextProcessor
@@ -33,6 +33,4 @@ __all__ = [
     'BaseAIClient',
     'BaseTextProcessor',
     'create_ai_client',
-    'tools',
-    'web',
 ]
