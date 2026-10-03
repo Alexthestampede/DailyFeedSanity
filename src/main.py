@@ -282,7 +282,18 @@ def main():
         logger.info(f"Output: {html_path}")
         logger.info(f"Comics: {len([r for r in comic_results if r.get('success', False)])}")
         logger.info(f"Articles: {len([r for r in article_results if r.get('success', False)])}")
-        logger.info(f"Errors: {len(processing_results.errors)}")
+
+        # Report every failure: feed-level errors plus failed articles/comics
+        item_failures = (
+            list(processing_results.errors)
+            + [r for r in article_results if not r.get('success', False)]
+            + [r for r in comic_results if not r.get('success', False)]
+        )
+        logger.info(f"Errors: {len(item_failures)}")
+        for failure in item_failures:
+            failure_label = failure.get('feed_name') or failure.get('feed_url', '?')
+            failure_reason = failure.get('error', 'Unknown error')
+            logger.warning(f"Failure: {failure_label}: {failure_reason}")
 
         if processing_results.errors:
             logger.warning("Some feeds had errors. Check the HTML output for details.")

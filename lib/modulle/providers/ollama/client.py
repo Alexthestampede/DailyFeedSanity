@@ -291,3 +291,76 @@ class OllamaClient:
                 'finish_reason': 'error',
                 'message': None
             }
+
+    def system_one(
+        self,
+        model,
+        state,
+        questions,
+        images=None,
+        keep_alive=None,
+        timeout=None,
+    ):
+        """
+        Decision-model API (e.g. clef / clef-flash) via Ollama's /v1/systemone endpoint.
+
+        Decision models score every option of every question jointly in a single
+        non-autoregressive pass. Requires Ollama >= 0.35.1.
+
+        Args:
+            model: Model name to use (e.g. 'clef-flash')
+            state: Text (or JSON-serializable object/array) to judge
+            questions: Dict of 1-64 named questions. Each question needs a 'type'
+                ('noul', 'choice', or 'score'), 'instructions', and usually
+                'criteria' (choice: option->description, 2-26 options;
+                score: list of level descriptions lowest-first, 2-26 levels;
+                noul: optionally {"true": "...", "false": "..."})
+            images: Optional list of base64-encoded PNG/JPEG/WebP images shared
+                by all questions (URLs and data URLs are not supported)
+            keep_alive: Optional keep-alive duration for the model
+            timeout: Request timeout in seconds (defaults to request_timeout * 3)
+
+        Returns:
+            Dict with keys:
+                - 'model': Model name
+                - 'answers': Dict mapping each question name to its typed answer
+                - 'usage': Token usage dict
+
+            None on error.
+        """
+        try:
+            payload = {"model": model, "state": state, "questions": questions}
+
+            if images:
+                payload["images"] = images
+            if keep_alive:
+                payload["keep_alive"] = keep_alive
+
+            logger.debug(f"Sending systemone request to decision model: {model}")
+            response = requests.post(
+                f"{self.base_url}/v1/systemone",
+                json=payload,
+                timeout=timeout if timeout is not None else self.request_timeout * 3,
+            )
+
+            # Check for errors and try to get detailed error message from Ollama
+            if not response.ok:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get('error', f"HTTP {response.status_code}")
+                    logger.error(f"Ollama systemone failed: {error_msg}")
+                except Exception:
+                    logger.error(f"Ollama systemone failed: HTTP {response.status_code}")
+                return None
+
+            data = response.json()
+            answers = data.get("answers", {})
+            logger.debug(f"Got {len(answers)} answer(s) from decision model")
+            return data
+
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Ollama systemone failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Unexpected error in Ollama systemone: {e}")
+            return None

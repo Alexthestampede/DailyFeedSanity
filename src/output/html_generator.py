@@ -53,12 +53,22 @@ class HTMLGenerator:
             # Generate sections
             comics_html = self._generate_comics_section(comic_results, output_dir)
             articles_html = self._generate_articles_section(article_results)
-            errors_html = self._generate_errors_section(processing_results.errors)
+
+            # Combine feed-level errors with per-item processing failures:
+            # feed fetch/parse errors come from the feed manager, article/comic
+            # failures carry their own 'error' field but used to be dropped
+            # silently, making the digest claim "0 errors" while items failed.
+            item_failures = (
+                processing_results.errors
+                + [r for r in article_results if not r.get('success', False)]
+                + [r for r in comic_results if not r.get('success', False)]
+            )
+            errors_html = self._generate_errors_section(item_failures)
 
             # Count successes
             comics_count = sum(1 for r in comic_results if r.get('success', False))
             articles_count = sum(1 for r in article_results if r.get('success', False))
-            errors_count = len(processing_results.errors)
+            errors_count = len(item_failures)
 
             # Generate final HTML
             html = HTML_TEMPLATE.format(
@@ -317,17 +327,23 @@ class HTMLGenerator:
         """
         Generate HTML for a single error.
 
+        Handles both feed-level errors ({'feed_url', 'error'}) and per-item
+        failures ({'feed_name', 'error', optionally 'title'/'url'}).
+
         Args:
             error: Error dict
 
         Returns:
             HTML string
         """
-        feed_url = error.get('feed_url', 'Unknown')
+        feed_label = error.get('feed_name') or error.get('feed_url', 'Unknown')
         error_message = error.get('error', 'Unknown error')
+        title = error.get('title') or error.get('generated_title') or ''
+
+        label = f"{feed_label} - {title}" if title else feed_label
 
         error_html = ERROR_ITEM_TEMPLATE.format(
-            feed_url=self._escape_html(feed_url),
+            feed_url=self._escape_html(label),
             error_message=self._escape_html(error_message)
         )
 
