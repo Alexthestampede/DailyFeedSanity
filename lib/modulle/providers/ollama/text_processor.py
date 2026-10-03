@@ -7,9 +7,9 @@ All application logic should be built on top of this generic interface.
 
 from typing import Any, Dict, List, Optional
 
-from modulle.base import BaseTextProcessor
-from modulle.config import DEFAULT_TEMPERATURE
-from modulle.utils.logging_config import get_logger
+from ...base import BaseTextProcessor
+from ...config import DEFAULT_TEMPERATURE
+from ...utils.logging_config import get_logger
 
 from .client import OllamaClient
 

@@ -6,9 +6,9 @@ All application logic should be built on top of this generic interface.
 """
 from typing import Optional
 from .client import OpenAIClient
-from modulle.utils.logging_config import get_logger
-from modulle.config import DEFAULT_TEMPERATURE
-from modulle.base import BaseVisionProcessor
+from ...utils.logging_config import get_logger
+from ...config import DEFAULT_TEMPERATURE
+from ...base import BaseVisionProcessor
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
 

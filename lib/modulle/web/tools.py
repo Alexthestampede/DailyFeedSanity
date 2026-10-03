@@ -1,9 +1,9 @@
 """Web access tools for LLM tool calling."""
 
 from typing import Dict, Any
-from modulle.tools.base import BaseTool
+from ..tools.base import BaseTool
 from .accessor import WebAccessor
-from modulle.utils.logging_config import get_logger
+from ..utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

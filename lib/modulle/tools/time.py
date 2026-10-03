@@ -14,7 +14,7 @@ Example:
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from modulle.utils.logging_config import get_logger
+from ..utils.logging_config import get_logger
 
 from .base import BaseTool
 

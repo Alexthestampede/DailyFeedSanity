@@ -4,7 +4,7 @@ from typing import Optional, List, Dict, Any
 from .fetcher import WebFetcher
 from .search import create_searcher, SearchBackend
 from .converter import HTMLConverter
-from modulle.utils.logging_config import get_logger
+from ..utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

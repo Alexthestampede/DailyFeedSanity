@@ -8,9 +8,9 @@ Note: LM Studio vision support depends on the loaded model having vision capabil
 """
 from typing import Optional
 from .client import LMStudioClient
-from modulle.utils.logging_config import get_logger
-from modulle.config import DEFAULT_TEMPERATURE
-from modulle.base import BaseVisionProcessor
+from ...utils.logging_config import get_logger
+from ...config import DEFAULT_TEMPERATURE
+from ...base import BaseVisionProcessor
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
 

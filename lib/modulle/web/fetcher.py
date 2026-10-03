@@ -3,8 +3,8 @@
 import requests
 from typing import Optional, Dict, Any
 from bs4 import BeautifulSoup
-from modulle.utils.http_client import fetch_url, create_session
-from modulle.utils.logging_config import get_logger
+from ..utils.http_client import fetch_url, create_session
+from ..utils.logging_config import get_logger
 
 logger = get_logger(__name__)
 

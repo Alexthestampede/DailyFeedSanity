@@ -9,7 +9,7 @@ A unified interface for multiple AI/LLM providers including:
 - Anthropic Claude (cloud)
 
 Example usage:
-    from modulle import create_ai_client
+    from . import create_ai_client
 
     client, text_processor, vision_processor = create_ai_client(
         provider='ollama',

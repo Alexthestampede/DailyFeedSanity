@@ -6,9 +6,9 @@ OpenAI chat completions format for all operations.
 """
 import requests
 from typing import Optional, List, Dict
-from modulle.utils.logging_config import get_logger
-from modulle.config import LM_STUDIO_BASE_URL, REQUEST_TIMEOUT
-from modulle.base import BaseAIClient
+from ...utils.logging_config import get_logger
+from ...config import LM_STUDIO_BASE_URL, REQUEST_TIMEOUT
+from ...base import BaseAIClient
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
 

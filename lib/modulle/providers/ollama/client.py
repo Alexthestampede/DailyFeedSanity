@@ -6,9 +6,9 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
-from modulle.config import OLLAMA_BASE_URL, REQUEST_TIMEOUT
-from modulle.utils.logging_config import get_logger
-from modulle.utils.response_cleaner import clean_response
+from ...config import OLLAMA_BASE_URL, REQUEST_TIMEOUT
+from ...utils.logging_config import get_logger
+from ...utils.response_cleaner import clean_response
 
 logger = get_logger(__name__.replace("modulle.providers.", ""))
 

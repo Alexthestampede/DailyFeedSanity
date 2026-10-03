@@ -7,9 +7,9 @@ All application logic should be built on top of this generic interface.
 
 from typing import Optional
 
-from modulle.base import BaseVisionProcessor
-from modulle.config import DEFAULT_TEMPERATURE
-from modulle.utils.logging_config import get_logger
+from ...base import BaseVisionProcessor
+from ...config import DEFAULT_TEMPERATURE
+from ...utils.logging_config import get_logger
 
 from .client import OllamaClient
 
