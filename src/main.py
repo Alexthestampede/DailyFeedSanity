@@ -157,6 +157,19 @@ def main():
     logger.info("RSS Feed Processor Starting")
     logger.info("="*60)
 
+    # Check for available updates (non-interactive, best-effort).
+    # Result surfaces as a banner in the generated digest page.
+    update_status = None
+    try:
+        from .utils.config_wizard import get_update_status
+        update_status = get_update_status()
+        if update_status["status"] == "behind":
+            logger.info(
+                f"Update check: {update_status['behind_count']} commit(s) behind origin/master"
+            )
+    except Exception as e:
+        logger.debug(f"Update check skipped: {e}")
+
     # Check for first-time setup
     if should_run_first_setup():
         logger.info("First-time setup required")
@@ -273,7 +286,8 @@ def main():
             processing_results,
             comic_results,
             article_results,
-            output_folder
+            output_folder,
+            update_status=update_status,
         )
 
         logger.info("="*60)

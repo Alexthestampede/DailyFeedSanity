@@ -11,10 +11,12 @@ from .templates import (
     ARTICLES_SECTION_TEMPLATE,
     ARTICLE_ITEM_TEMPLATE,
     ERRORS_SECTION_TEMPLATE,
-    ERROR_ITEM_TEMPLATE
+    ERROR_ITEM_TEMPLATE,
+    UPDATE_BANNER_TEMPLATE
 )
 from ..utils.logging_config import get_logger
 from ..config import HTML_TITLE, DATE_FORMAT, DATETIME_FORMAT
+from .. import config as app_config
 
 logger = get_logger(__name__)
 
@@ -30,7 +32,8 @@ class HTMLGenerator:
         """
         pass
 
-    def generate(self, processing_results, comic_results, article_results, output_dir):
+    def generate(self, processing_results, comic_results, article_results, output_dir,
+                 update_status=None):
         """
         Generate HTML page from processing results.
 
@@ -39,6 +42,8 @@ class HTMLGenerator:
             comic_results: List of comic download results
             article_results: List of article processing results
             output_dir: Directory to save HTML file
+            update_status: Optional dict from get_update_status() - when
+                status is 'behind', renders an update banner in the page
 
         Returns:
             Path to generated HTML file
@@ -49,6 +54,11 @@ class HTMLGenerator:
             # Prepare data
             date_str = datetime.now().strftime(DATE_FORMAT)
             datetime_str = datetime.now().strftime(DATETIME_FORMAT)
+
+            # Update banner (only when an update is actually available)
+            update_banner_html = ""
+            if update_status and update_status.get("status") == "behind":
+                update_banner_html = self._generate_update_banner(update_status)
 
             # Generate sections
             comics_html = self._generate_comics_section(comic_results, output_dir)
@@ -78,6 +88,8 @@ class HTMLGenerator:
                 comics_count=comics_count,
                 articles_count=articles_count,
                 errors_count=errors_count,
+                app_version=app_config.__version__,
+                update_banner=update_banner_html,
                 comics_section=comics_html,
                 articles_section=articles_html,
                 errors_section=errors_html
@@ -322,6 +334,36 @@ class HTMLGenerator:
         )
 
         return section_html
+
+    def _generate_update_banner(self, update_status):
+        """
+        Generate HTML banner announcing an available update.
+
+        Args:
+            update_status: dict from get_update_status() with 'behind_count'
+                and 'new_commits'
+
+        Returns:
+            HTML string
+        """
+        behind = update_status.get("behind_count", 0)
+        commits = update_status.get("new_commits", [])
+
+        commit_items = ""
+        if commits:
+            items = "\n".join(
+                f"<li><code>{self._escape_html(c)}</code></li>" for c in commits[:10]
+            )
+            more = (
+                f'<li>... and {len(commits) - 10} more</li>'
+                if len(commits) > 10 else ""
+            )
+            commit_items = f"<ul class=\"update-commits\">{items}{more}</ul>"
+
+        return UPDATE_BANNER_TEMPLATE.format(
+            behind_count=behind,
+            commit_list=commit_items,
+        )
 
     def _generate_error_item(self, error):
         """

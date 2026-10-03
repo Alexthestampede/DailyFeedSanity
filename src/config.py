@@ -4,8 +4,12 @@ Configuration constants for RSS Feed Processor
 
 import os
 
+# Application version: YYYYMMDD.N scheme (date of the release + release
+# number for that day, starting at .1 each day)
+__version__ = "20261003.1"
+
 # AI Provider Configuration
-# Supported providers: 'ollama', 'lm_studio', 'openai', 'gemini', 'claude'
+# Supported providers: 'ollama', 'ollama_cloud', 'lm_studio', 'openai', 'gemini', 'claude'
 AI_PROVIDER = "ollama"  # Default to Ollama for backward compatibility
 
 # Feature Toggles

@@ -1074,100 +1074,105 @@ def display_config_summary(config: Dict):
     print()
 
 
+def get_update_status():
+    """
+    Non-interactive update check usable at any time.
+
+    Compares local HEAD against origin/master and reports how far behind
+    it is. Never prompts, never exits - suitable for calling at app launch.
+
+    Returns:
+        dict with keys:
+            - 'status': 'up-to-date', 'behind', 'dirty', or 'unavailable'
+            - 'behind_count': int (0 when not behind)
+            - 'new_commits': list of 'hash message' strings (empty when none)
+    """
+    status = {
+        "status": "unavailable",
+        "behind_count": 0,
+        "new_commits": [],
+    }
+
+    # Step 1: Verify we're in a git repository
+    try:
+        result = subprocess.run(
+            ["git", "rev-parse", "--is-inside-work-tree"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode != 0:
+            return status
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return status
+
+    # Step 2: Fetch latest changes from remote
+    try:
+        result = subprocess.run(
+            ["git", "fetch", "origin"], capture_output=True, text=True, timeout=10
+        )
+        if result.returncode != 0:
+            return status
+    except subprocess.TimeoutExpired:
+        return status
+
+    # Step 3: Check how many commits we are behind
+    try:
+        result = subprocess.run(
+            ["git", "rev-list", "--count", "HEAD..origin/master"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode != 0:
+            return status
+        behind_count = int(result.stdout.strip())
+    except (subprocess.TimeoutExpired, ValueError):
+        return status
+
+    if behind_count == 0:
+        status["status"] = "up-to-date"
+        return status
+
+    status["status"] = "behind"
+    status["behind_count"] = behind_count
+
+    # Step 4: Collect commit subjects (for the log / banner)
+    try:
+        result = subprocess.run(
+            ["git", "log", "--oneline", f"-{behind_count}", "HEAD..origin/master"],
+            capture_output=True, text=True, timeout=5,
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            status["new_commits"] = result.stdout.strip().split("\n")
+    except (subprocess.TimeoutExpired, Exception):
+        pass
+
+    return status
+
+
 def check_for_updates():
     """
     Check for updates by comparing local and remote git repositories.
     Offers to pull updates if behind the remote master branch.
     """
     print_section("Check for Updates")
+    status = get_update_status()
 
-    # Step 1: Verify we're in a git repository
-    try:
-        result = subprocess.run(
-            ["git", "rev-parse", "--is-inside-work-tree"],
-            capture_output=True,
-            text=True,
-            timeout=5,
+    if status["status"] == "unavailable":
+        print(
+            "Cannot check for updates (not a git repo, no remote, "
+            "git missing, or no network)."
         )
-        if result.returncode != 0:
-            print("This directory is not a git repository.")
-            print("Updates can only be checked in a git-managed installation.")
-            return
-    except FileNotFoundError:
-        print("Git is not installed or not found in PATH.")
-        print("Please install git to use the update feature.")
-        return
-    except subprocess.TimeoutExpired:
-        print("Git command timed out.")
         return
 
-    # Step 2: Fetch latest changes from remote
-    print("Fetching latest changes from remote...")
-    try:
-        result = subprocess.run(
-            ["git", "fetch", "origin"], capture_output=True, text=True, timeout=10
-        )
-        if result.returncode != 0:
-            stderr = result.stderr.strip()
-            if "Could not resolve host" in stderr or "unable to access" in stderr:
-                print("No network connection available. Cannot check for updates.")
-            elif "No such remote" in stderr or "doesn't have any remote" in stderr:
-                print("No remote 'origin' configured for this repository.")
-                print("Updates cannot be checked without a remote.")
-            else:
-                print(f"Failed to fetch from remote: {stderr}")
-            return
-    except subprocess.TimeoutExpired:
-        print("Network request timed out. Check your internet connection.")
-        return
-
-    # Step 3: Check how many commits we are behind
-    try:
-        result = subprocess.run(
-            ["git", "rev-list", "--count", "HEAD..origin/master"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode != 0:
-            stderr = result.stderr.strip()
-            if "unknown revision" in stderr:
-                print("Remote branch 'origin/master' not found.")
-                print("The remote repository may use a different branch name.")
-            else:
-                print(f"Failed to check for updates: {stderr}")
-            return
-
-        behind_count = int(result.stdout.strip())
-    except subprocess.TimeoutExpired:
-        print("Git command timed out.")
-        return
-    except ValueError:
-        print("Could not determine update status.")
-        return
-
-    # Step 4: Report status
-    if behind_count == 0:
+    if status["status"] == "up-to-date":
         print("You are up to date! No new updates available.")
         return
 
-    print(f"You are {behind_count} commit(s) behind origin/master.\n")
+    print(f"You are {status['behind_count']} commit(s) behind origin/master.\n")
 
-    # Show recent commit messages
-    try:
-        result = subprocess.run(
-            ["git", "log", "--oneline", "HEAD..origin/master"],
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        if result.returncode == 0 and result.stdout.strip():
-            print("New changes:")
-            for line in result.stdout.strip().split("\n"):
-                print(f"  {line}")
-            print()
-    except (subprocess.TimeoutExpired, Exception):
-        pass  # Non-critical, continue even if log fails
+    if status["new_commits"]:
+        print("New changes:")
+        for line in status["new_commits"]:
+            print(f"  {line}")
+        print()
 
     # Step 5: Offer to pull
     if not get_yes_no("Do you want to update now?", default=True):

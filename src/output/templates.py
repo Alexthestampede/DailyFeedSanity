@@ -266,6 +266,49 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             font-size: 0.9em;
         }}
 
+        .update-banner {{
+            background-color: #fff3cd;
+            border: 1px solid #ffecb5;
+            border-left: 4px solid #ffc107;
+            color: #664d03;
+            padding: 15px 20px;
+            border-radius: 6px;
+            margin-bottom: 30px;
+        }}
+
+        .update-banner .update-title {{
+            font-weight: 600;
+            margin-bottom: 5px;
+        }}
+
+        .update-banner a {{
+            color: #0d6efd;
+        }}
+
+        .update-banner .update-commits {{
+            margin: 10px 0 0 0;
+            padding-left: 20px;
+            font-size: 0.9em;
+        }}
+
+        .update-banner .update-commits code {{
+            background-color: rgba(0,0,0,0.06);
+            padding: 1px 5px;
+            border-radius: 3px;
+        }}
+
+        .version {{
+            display: inline-block;
+            font-size: 0.85em;
+            color: #6c757d;
+            background-color: #eef1f4;
+            border: 1px solid #dee2e6;
+            border-radius: 10px;
+            padding: 1px 8px;
+            margin-left: 6px;
+            font-family: monospace;
+        }}
+
         footer {{
             margin-top: 40px;
             padding-top: 20px;
@@ -411,6 +454,23 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             footer a:hover {{
                 color: #4a9eff;
             }}
+
+            .update-banner {{
+                background-color: #3d3320;
+                border-color: #5c4d24;
+                border-left-color: #ffc107;
+                color: #e6d9a8;
+            }}
+
+            .update-banner .update-commits code {{
+                background-color: rgba(255,255,255,0.08);
+            }}
+
+            .version {{
+                color: #a0a0a0;
+                background-color: #3a3a3a;
+                border-color: #484848;
+            }}
         }}
 
         @media (max-width: 768px) {{
@@ -449,6 +509,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             </div>
         </div>
 
+        {update_banner}
+
         {comics_section}
 
         {articles_section}
@@ -456,7 +518,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         {errors_section}
 
         <footer>
-            <p>Generated on {datetime} by <a href="https://github.com/Alexthestampede/DailyFeedSanity" target="_blank" style="color: #007bff; text-decoration: none;">DailyFeedSanity</a></p>
+            <p>Generated on {datetime} by <a href="https://github.com/Alexthestampede/DailyFeedSanity" target="_blank" style="color: #007bff; text-decoration: none;">DailyFeedSanity</a> <span class="version">v{app_version}</span></p>
             <p style="margin-top: 10px; font-size: 0.95em;">A project made possible by <a href="https://claude.ai/code" target="_blank" style="color: #007bff; text-decoration: none;">Claude Code</a></p>
             <p style="margin-top: 15px; font-size: 1em; color: #495057;">
                 Please consider visiting the original sites and supporting the creators who make this content possible.
@@ -530,5 +592,16 @@ ERROR_ITEM_TEMPLATE = """
 <div class="error">
     <div class="error-feed">Feed: {feed_url}</div>
     <div class="error-message">{error_message}</div>
+</div>
+"""
+
+UPDATE_BANNER_TEMPLATE = """
+<div class="update-banner">
+    <div class="update-title">&#x1F4E6; A new version of DailyFeedSanity is available ({behind_count} update(s) behind)</div>
+    <div>
+        To update: run <code>./dailyfeedsanity.sh --config</code> to open the setup wizard,
+        then pick the <strong>Check for updates</strong> option at your convenience.
+    </div>
+    {commit_list}
 </div>
 """
