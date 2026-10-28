@@ -1,227 +1,77 @@
 # AGENTS.md
 
-This file contains guidelines for agentic coding agents operating in this repository.
+Guidelines for agentic coding agents operating in this repository.
 
-## Project Overview
+## Overview
 
-RSS Feed Processor - Processes RSS feeds, downloads webcomics, summarizes news articles using AI, and generates HTML digest pages.
+DailyFeedSanity: processes RSS feeds concurrently, downloads webcomics, summarizes news articles with AI (one JSON call per article: title + summary + clickbait/ad verdicts), generates a daily HTML digest in `output/YYYY-MM-DD/index.html`. Version scheme `YYYYMMDD.N` in `src/config.py __version__` (bump `.N` for same-day releases).
 
-## Build/Lint/Test Commands
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Run single test
-python -m pytest scripts/test_ollama_summarizer.py -v
-
-# Run all tests
-python -m pytest scripts/ -v
-
-# Run specific test with args
-python scripts/test_ollama_summarizer.py <url> --model "granite4:tiny-h"
-
-# Lint with ruff
-ruff check .
-
-# Format with black
-black .
-
-# Run main application
-python -m src.main
-
-# Run configuration wizard
-python -m src.utils.config_wizard
-```
-
-## Code Style Guidelines
-
-### General
-- Python 3.8+ syntax
-- Use type hints for all function parameters and return values
-- Follow Google-style docstrings for all public functions and classes
-
-### Naming Conventions
-- `snake_case`: functions, variables, modules
-- `PascalCase`: classes
-- `UPPER_CASE`: constants
-- Prefix private methods with underscore
-
-### Imports
-- Absolute imports only, no relative imports
-- Group imports: standard library → third-party → local modules
-- Use explicit imports from modules (avoid `import *`)
-
-### Error Handling
-- Use specific exception types (avoid bare `except:`)
-- Use `try/except/finally` for cleanup operations
-- Log errors with appropriate level using logging module
-- Return meaningful error values or raise custom exceptions
-
-### Logging
-```python
-from .utils.logging_config import get_logger
-logger = get_logger(__name__)
-
-logger.debug("Detailed info")
-logger.info("General events")
-logger.warning("Potential issues")
-logger.error("Serious problems")
-logger.critical("Severe errors")
-```
-
-### Type Hints
-```python
-from typing import Optional, List, Dict, Any
-
-def process_feed(url: str, timeout: int = 30) -> Optional[Dict[str, Any]]:
-    """Process a single feed."""
-    pass
-```
-
-### Configuration
-- All constants in `src/config.py`
-- Use environment variables for API keys: `os.getenv('API_KEY', '')`
-- Never commit secrets or API keys
-
-### Testing
-- Tests in `scripts/` directory
-- Use pytest for test execution
-- Follow existing patterns in test files
-- Test files named `test_*.py` or `*_test.py`
-- Keep live test runs small: max 5 articles when testing against a real feed
-  (e.g. `--feeds <file>` + `--all-entries` on a small trimmed feed list, or
-  interrupt after a few). Never run 59-article batches for testing.
-
-## Project Structure
-
-```
-RSS copy (1)/
-├── src/                      # Source code
-│   ├── main.py               # Main entry point
-│   ├── config.py             # Configuration constants
-│   ├── ai_client/            # AI provider abstraction
-│   │   ├── base.py           # Base abstract classes
-│   │   ├── factory.py        # Provider factory
-│   │   └── domain_*.py       # Text/Vision processors
-│   ├── comics/               # Webcomic downloaders
-│   ├── news/                 # Article extraction/summarization
-│   ├── feed_processor/       # RSS feed handling
-│   ├── output/               # HTML generation
-│   └── utils/                # Utilities (logging, file ops)
-├── scripts/                  # Test scripts
-├── lib/modulle/              # ModuLLe AI abstraction layer
-├── output/                   # Generated HTML output
-├── temp/                     # Temporary files
-└── requirements.txt          # Python dependencies
-```
-
-## AI Provider Integration
-
-### Supported Providers
-- `ollama` (default) - Local, free
-- `lm_studio` - Local, free
-- `openai` - Cloud, paid
-- `gemini` - Cloud, free tier available
-- `claude` - Cloud, paid
-
-### Architecture
-- All providers implement `BaseAIClient` interface
-- Factory pattern for provider selection
-- Health checks required before processing
-- Text and vision models configured separately
-
-### Interface Requirements
-```python
-class BaseAIClient(ABC):
-    def health_check(self) -> bool: ...
-    def list_models(self) -> List[str]: ...
-    def generate(self, model: str, prompt: str, ...) -> Optional[str]: ...
-    def chat(self, model: str, messages: List[Dict], ...) -> Optional[str]: ...
-```
-
-## Key Components
-
-### Feed Processing
-- `FeedManager` - Orchestrates feed processing
-- `FeedParser` - Parses RSS/Atom feeds
-- `FeedClassifier` - Detects feed type (comic/news)
-- Max concurrent feeds: 10
-- Per-feed timeout: 120 seconds
-
-### Comics
-- `ComicDownloader` - Downloads comic images
-- Custom extractors for special comics (Oglaf, Penny Arcade, etc.)
-- Vision model for multi-page detection
-
-### News Articles
-- `ArticleExtractor` - Extracts article content
-- `ContentCleaner` - Cleans HTML/text
-- `NewsSummarizer` - Generates AI summaries
-- Max article length: 10,000 characters
-
-### Output
-- HTML digest page in `output/YYYY-MM-DD/index.html`
-- Dark mode support
-- Templates in `src/output/templates.py`
-
-## Development Notes
-
-### Concurrency
-- Uses `concurrent.futures.ThreadPoolExecutor`
-- `MAX_CONCURRENT_FEEDS = 10`
-- Use thread-safe operations for shared resources
-
-### HTTP Client
-- Custom HTTP client in `src/utils/http_client.py`
-- User-Agent rotation
-- Retry with exponential backoff
-- Timeout: 30 seconds
-
-### Caching
-- Feed type cache: `.feed_type_cache.json`
-- Language cache: `.feed_language_cache.json`
-- Feed overrides via `*_overrides.txt` files
-
-### Command-Line Arguments
-- `--debug` - Enable debug logging
-- `--ai-provider` - Override AI provider
-- `--validate-images` - Enable vision validation
-- `--all-entries` - Process all articles (not just 24h)
-- `--no-vision` - Disable vision model
-- `--feeds` - Custom feed file
-- `--output` - Custom output directory
-
-## Dependencies
-
-Core:
-- `feedparser` - RSS/Atom parsing
-- `requests` - HTTP requests
-- `trafilatura` - Web content extraction
-- `beautifulsoup4` - HTML parsing
-- `Pillow` - Image processing
-- `python-dateutil` - Date parsing
-
-## Environment Variables
+## Commands
 
 ```bash
-OPENAI_API_KEY=
-GEMINI_API_KEY=        # or GOOGLE_API_KEY
-ANTHROPIC_API_KEY=
+./dailyfeedsanity.sh                      # Run the app (uses .venv; sets cwd to project root)
+python -m src.main                        # Run the app directly
+python -m src.main --feeds <file> --all-entries   # Custom feeds, bypass 24h filter
+./dailyfeedsanity.sh --config             # Interactive wizard (also: python -m src.utils.config_wizard)
+
+python scripts/test_response_cleaner.py   # Unit tests: run standalone, NOT via pytest
+python scripts/test_json_extractor.py     # (they have __main__ entry points)
+python scripts/test_thinking_model_handling.py
+python scripts/test_single_article_ornith.py   # Live end-to-end vs remote Ollama
+
+python scripts/sync_modulle.py            # Sync vendored lib/modulle from ~/Aish/ModuLLe
+python scripts/sync_modulle.py --check    # Drift report only
+
+ruff check .                              # Lint
+black .                                   # Format
 ```
 
-## For LLM Agents: Current Date
+**Test execution quirk:** many `scripts/test_*.py` are standalone scripts with `main()` functions (some take CLI args like `test_ollama_summarizer.py <url>`). Under pytest, parameter-less functions whose names look like tests but take args (e.g. `test_ollama_connection(server_url)`) get collected and ERROR at setup ("fixture not found"). Run these standalone: `python scripts/<name>.py`. Only `test_response_cleaner.py`, `test_json_extractor.py` (mock-only suites) are deterministic offline tests; the rest need a live Ollama server.
 
-When you need the current date for context (e.g., for time-based filtering, naming, or date-sensitive operations), use:
+**Install:** `./setup.sh` (creates `.venv`, installs deps, runs wizard) or `pip install -r requirements.txt` + `python -m src.utils.config_wizard`.
 
-```bash
-date +%Y-%m-%d
-```
+## Configuration layering (critical)
 
-Or in Python code:
-```python
-from datetime import datetime
-today = datetime.now().strftime('%Y-%m-%d')
-```
+Settings resolve: `.config.json` (wizard-written) → env vars → `src/config.py` defaults.
 
-**Today's date:** Run `date +%Y-%m-%d` to get the current date in the format used by this project (YYYY-MM-DD), which matches the output folder naming convention.
+- User settings live in `.config.json` (NOT committed): `ai_provider`, `text_model`, `vision_model`, `ollama_base_url`, `enable_ad_detection`, `request_timeout`, API keys.
+- To change AI model/provider/timeout/ad-detection, update `.config.json` via wizard options [1]-[3], [14] toggle ad detection, [15] set request timeout - or edit the JSON directly.
+- `request_timeout` (default 30s): HTTP fetches use it directly; **AI generation calls use 3x**. Raise to 300+ for large local models.
+- `ENABLE_AD_DETECTION` in `src/config.py` is only the *default*; the per-instance setting from `.config.json` (`enable_ad_detection`) is what actually gates detection at runtime. Don't "fix" this by reading the constant at the call site.
+
+## Architecture notes
+
+- **Two AI layers:** `lib/modulle` (vendored generic abstraction, upstream: github.com/Alexthestampede/ModuLLe) provides `BaseAIClient`/`BaseTextProcessor`; `src/ai_client/` wraps it with domain logic (`DomainTextProcessor`: summarization, clickbait/ad detection). Keep application logic in `src/`, keep ModuLLe generic.
+- **News flow:** extract (trafilatura) → single JSON call (title+summary+verdicts) → fallback to legacy 4-call path if JSON parse fails. Detection prompts use only the first 1000 chars; summarization the first 10,000.
+- **Vendored copy diverges from upstream by import style only:** upstream uses absolute `from modulle.x import y` (assumes pip install); vendored uses package-relative (`from ...utils.x import`). After every sync, run `scripts/sync_modulle.py` which rewrites imports automatically. Hand-editing vendored files risks divergence - port changes upstream first, then sync.
+- **Import-masking trap:** a stale `pip install -e` of ModuLLe 0.1.0 can satisfy `import modulle` in a dev shell and mask broken vendored imports. Verify with `sys.modules['modulle'] = None` before imports (sync script does this). The app's `.venv` has no such shadow.
+- **Concurrency:** feed fetching is parallel (`ThreadPoolExecutor`, `MAX_CONCURRENT_FEEDS=10`); article processing is sequential per article (4 AI calls → 1 with single-call workflow). This is the bottleneck, not fetching.
+- **Error visibility:** feed-level errors AND failed articles/comics all roll into the digest's Errors section and the end-of-run log. `success: False` results must not be silently dropped.
+
+## Thinking models (hard-won)
+
+Models like Qwen3/Qwen3.8/Nemotron/Ornith emit chain-of-thought either in `thought` tags or as plain text ("We need answer...", "The user wants me to..."). Handling lives in `lib/modulle/utils/response_cleaner.py` (tag stripping, reasoning detection, strict `parse_yes_no`) and `lib/modulle/utils/json_extractor.py` (extracts JSON from fenced/preamble/reasoning-wrapped responses). Provider clients and `DomainTextProcessor` both clean defensively. Never parse detection verdicts with `"yes" in response` - reasoning mentioning "yes" in passing flags everything.
+
+**Ollama generation must go through `/api/chat`** (`OllamaTextProcessor.generate()` routes there): `/api/generate` truncates mid-response and leaks CoT with chat-template models. This was a production bug (logs/thehorror.html precedent).
+
+## Live testing rules
+
+- **Max 5 articles per live test run.** Use a trimmed feed file + `--all-entries`, or interrupt after 5. Never launch full `--all-entries` against a 59-entry feed as a "test".
+- Live tests hit the user's remote Ollama (`http://192.168.2.150:11434` per `.config.json`) - a shared machine. Local `localhost:11434` may not have the same models.
+- To get the current date: `date +%Y-%m-%d` (matches output-folder naming `YYYY-MM-DD`).
+
+## Code style
+
+- Python 3.8+: type hints on all params/returns, Google-style docstrings on public functions/classes
+- `snake_case` functions/vars, `PascalCase` classes, `UPPER_CASE` constants, `_underscore` privates
+- Imports: standard → third-party → local; explicit names (no `import *`)
+- Logging: `from ..utils.logging_config import get_logger; logger = get_logger(__name__)` - never `print()` in `src/`
+- Specific exception types, no bare `except:`; log-and-return-None is the established error style in AI-layer code
+- Secrets only via env vars (`OPENAI_API_KEY`, `GEMINI_API_KEY`/`GOOGLE_API_KEY`, `ANTHROPIC_API_KEY`, `OLLAMA_API_KEY`); never commit keys or `.config.json`
+
+## Version bump checklist
+
+1. `__version__` in `src/config.py`
+2. Run offline test suites (3 standalone scripts above)
+3. If touching `lib/modulle`: run `python scripts/sync_modulle.py --check` first; port changes upstream, then sync
+4. One small live run (≤5 articles) if AI-behavior code changed
