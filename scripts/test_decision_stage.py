@@ -161,6 +161,67 @@ def main():
     result = proc.generate_summary(ARTICLE_TEXT, title=ARTICLE_TITLE)
     check("legacy path still works", result["is_clickbait"], False)
 
+    # --- Pre-filter routing (probe bands) ---
+
+    # 9. Confident not-ad probe (low band) -> generative NOT asked verdicts
+    class AssertNoVerdictsGen(MockGenerativeSingleCall):
+        def generate(self, prompt, system_prompt=None, temperature=0.7, max_tokens=None):
+            if "is_clickbait" in (system_prompt or ""):
+                raise AssertionError("confident probe must remove verdicts from prompt")
+            return TITLE_SUMMARY_JSON
+
+    probe_low = {"clickbait_probability": 0.02, "ad_probability": 0.05}
+    gen = AssertNoVerdictsGen()
+    proc = DomainTextProcessor(
+        gen, enable_ad_detection=True,
+        decision_client=MockDecisionClient(), decision_model="d1k32:latest",
+        decision_threshold=0.7,
+    )
+    result = proc.generate_summary_single_call(
+        ARTICLE_TEXT, title=ARTICLE_TITLE, probe=probe_low)
+    check("low-band: verdicts from probe", result["is_ad"], False)
+    check("low-band: probe ad_probability echoed", round(result["ad_probability"], 2), 0.05)
+    check("low-band: only one system_one call (probe reused)",
+          len(proc.decision_client.calls), 0)
+
+    # 10. Confident ad probe (>= threshold) -> verdict True from probe,
+    #     generative still asked for summary+title (clickbait-styling path)
+    probe_high = {"clickbait_probability": 0.02, "ad_probability": 0.75}
+    proc = DomainTextProcessor(
+        AssertNoVerdictsGen(), enable_ad_detection=True,
+        decision_client=MockDecisionClient(), decision_model="d1k32:latest",
+        decision_threshold=0.7,
+    )
+    result = proc.generate_summary_single_call(
+        ARTICLE_TEXT, title=ARTICLE_TITLE, probe=probe_high)
+    check("high-band: is_ad True from probe", result["is_ad"], True)
+
+    # 11. Ambiguous probe (0.3 <= p < 0.7) -> generative asked verdicts
+    class WithVerdictsGen:
+        def generate(self, prompt, system_prompt=None, temperature=0.7, max_tokens=None):
+            if "is_clickbait" not in (system_prompt or ""):
+                raise AssertionError("ambiguous probe must ask generative for verdicts")
+            return TITLE_SUMMARY_JSON
+
+    probe_amb = {"clickbait_probability": 0.10, "ad_probability": 0.50}
+    gen = WithVerdictsGen()
+    proc = DomainTextProcessor(
+        gen, enable_ad_detection=True,
+        decision_client=MockDecisionClient(), decision_model="d1k32:latest",
+        decision_threshold=0.7,
+    )
+    result = proc.generate_summary_single_call(
+        ARTICLE_TEXT, title=ARTICLE_TITLE, probe=probe_amb)
+    check("ambiguous: verdicts from generative JSON", result["is_ad"], False)
+    check("ambiguous: detected_by ai", result["clickbait_detected_by"], None)
+
+    # 12. Probe without decision stage configured -> probe ignored, full JSON
+    probe_low2 = {"clickbait_probability": 0.02, "ad_probability": 0.05}
+    proc = DomainTextProcessor(WithVerdictsGen(), enable_ad_detection=True)
+    result = proc.generate_summary_single_call(
+        ARTICLE_TEXT, title=ARTICLE_TITLE, probe=probe_low2)
+    check("no decision stage: probe harmless", result is not None, True)
+
     print()
     if failures:
         print(f"{failures} test(s) FAILED")

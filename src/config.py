@@ -6,7 +6,7 @@ import os
 
 # Application version: YYYYMMDD.N scheme (date of the release + release
 # number for that day, starting at .1 each day)
-__version__ = "20261028.2"
+__version__ = "20261028.3"
 
 # AI Provider Configuration
 # Supported providers: 'ollama', 'ollama_cloud', 'lm_studio', 'openai', 'gemini', 'claude'
@@ -22,6 +22,11 @@ ENABLE_AD_DETECTION = (
 # come from one /v1/systemone request returning noul probabilities instead of
 # the generative model's JSON verdicts.
 DECISION_VERDICT_THRESHOLD = 0.7  # Probability of 'true' above which a verdict is positive
+# Pre-filter routing (fast path): probabilities at or above DROP skip the
+# generative model entirely; the band between AMBIGUOUS_LOW and VERDICT_THRESHOLD
+# is treated as ambiguous and the generative model produces the verdicts.
+DECISION_AD_DROP_THRESHOLD = 0.9  # Pure ads: skip summarization pre-filter
+DECISION_AMBIGUOUS_LOW = 0.3  # Below: confident not-ad; above: maybe-ad band starts
 
 # Ollama Configuration
 OLLAMA_BASE_URL = "http://localhost:11434"

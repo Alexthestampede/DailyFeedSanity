@@ -26,6 +26,7 @@ from ..config import (
     CLICKBAIT_AUTHORS,
     AD_DETECTION_TEMPERATURE,
     DECISION_VERDICT_THRESHOLD,
+    DECISION_AMBIGUOUS_LOW,
 )
 
 logger = get_logger(__name__)
@@ -196,9 +197,9 @@ class DomainTextProcessor:
             logger.error(f"Error in ad detection: {e}")
             return False
 
-    def detect_verdicts_decision(self, title, text):
+    def probe_verdicts(self, title, text):
         """
-        Produce clickbait/ad verdicts via the decision-model stage.
+        Raw decision-model verdict probabilities (no thresholding).
 
         One /v1/systemone request answers both questions as noul
         probabilities on the article's title and excerpt. Probabilities are
@@ -210,8 +211,9 @@ class DomainTextProcessor:
             text: Article text (first 2000 chars used as state context)
 
         Returns:
-            dict with 'is_clickbait', 'clickbait_probability',
-            'is_ad', 'ad_probability', or None on error/failure
+            dict with 'clickbait_probability' and 'ad_probability'
+            (ad key present only when ad detection enabled),
+            or None when the decision stage is unavailable or failed
         """
         if not self.decision_client or not self.decision_model:
             return None
@@ -262,39 +264,66 @@ class DomainTextProcessor:
                 logger.warning("Decision stage returned no clickbait answer")
                 return None
 
-            verdicts = {
-                "is_clickbait": clickbait_prob >= self.decision_threshold,
+            probe = {
                 "clickbait_probability": clickbait_prob,
-                "is_ad": False,
                 "ad_probability": None,
             }
-            logger.info(
-                f"Decision clickbait p={clickbait_prob:.3f} "
-                f"({title[:50]}...)"
-            )
 
             if self.enable_ad_detection:
                 ad_answer = answers.get("is_ad", {})
                 ad_prob = ad_answer.get("noul")
                 if ad_prob is not None:
-                    verdicts["is_ad"] = ad_prob >= self.decision_threshold
-                    verdicts["ad_probability"] = ad_prob
-                    logger.info(f"Decision ad p={ad_prob:.3f}")
+                    probe["ad_probability"] = ad_prob
 
-            return verdicts
+            return probe
 
         except Exception as e:
             logger.warning(f"Decision-stage verdicts failed: {e}")
             return None
 
-    def _gather_verdicts(self, text, title, author):
+    def detect_verdicts_decision(self, title, text):
+        """
+        Threshold raw decision-model probabilities into boolean verdicts.
+
+        Args:
+            title: Article title
+            text: Article text (first 2000 chars used as state context)
+
+        Returns:
+            dict with 'is_clickbait', 'clickbait_probability',
+            'is_ad', 'ad_probability', or None on error/failure
+        """
+        probe = self.probe_verdicts(title, text)
+        if probe is None:
+            return None
+
+        verdicts = {
+            "is_clickbait": probe["clickbait_probability"] >= self.decision_threshold,
+            "clickbait_probability": probe["clickbait_probability"],
+            "is_ad": False,
+            "ad_probability": None,
+        }
+
+        if probe.get("ad_probability") is not None:
+            verdicts["is_ad"] = probe["ad_probability"] >= self.decision_threshold
+            verdicts["ad_probability"] = probe["ad_probability"]
+
+        return verdicts
+
+    def _gather_verdicts(self, text, title, author, probe=None):
         """
         Determine clickbait/ad verdicts for an article.
 
-        Prefers the decision-model stage when configured (one system_one
-        request, direct probabilities); falls back to legacy generative
-        detection calls (or full-JSON verdicts are supplied by the caller)
-        otherwise.
+        Uses a pre-computed probe when supplied (avoids a second
+        system_one request); otherwise asks the decision-model stage,
+        falling back to legacy generative detection calls when the
+        decision stage is unavailable or failed.
+
+        Args:
+            text: Article text
+            title: Article title
+            author: Article author (for clickbait-author override)
+            probe: Optional raw probabilities dict from probe_verdicts()
 
         Returns:
             dict with 'is_clickbait', 'clickbait_detected_by', 'is_ad',
@@ -302,7 +331,18 @@ class DomainTextProcessor:
         """
         is_clickbait_author = author in CLICKBAIT_AUTHORS if author else False
 
-        decision = self.detect_verdicts_decision(title, text)
+        if probe is not None:
+            decision = {
+                "is_clickbait": probe["clickbait_probability"] >= self.decision_threshold,
+                "clickbait_probability": probe["clickbait_probability"],
+                "is_ad": (
+                    probe.get("ad_probability") is not None
+                    and probe["ad_probability"] >= self.decision_threshold
+                ),
+                "ad_probability": probe.get("ad_probability"),
+            }
+        else:
+            decision = self.detect_verdicts_decision(title, text)
         result = {
             "is_clickbait": False,
             "clickbait_detected_by": None,
@@ -433,13 +473,18 @@ class DomainTextProcessor:
             return None
 
     def generate_summary_single_call(
-        self, text, title=None, author=None, language="English", max_length=500
+        self, text, title=None, author=None, language="English", max_length=500,
+        probe=None,
     ):
         """
         Generate summary + title + clickbait/ad verdicts in ONE AI call.
 
-        The model returns a JSON object with all fields. Falls back to None
-        when no valid JSON can be extracted (caller should skip the article).
+        The model returns a JSON object with all fields. When a decision
+        probe is supplied (pre-filter stage already ran), verdicts come
+        from the probe - the generative call produces summary + title only
+        for confident probe bands, and full JSON verdicts for ambiguous
+        bands. Falls back to None when no valid JSON can be extracted
+        (caller should skip the article).
 
         Args:
             text: Article text to summarize
@@ -447,6 +492,8 @@ class DomainTextProcessor:
             author: Article author (for clickbait detection)
             language: Language to use for summary/title
             max_length: Maximum summary length in characters
+            probe: Optional dict from probe_verdicts() with raw
+                'clickbait_probability'/'ad_probability'
 
         Returns:
             dict with 'summary', 'title', 'is_clickbait', 'clickbait_detected_by',
@@ -458,9 +505,26 @@ class DomainTextProcessor:
 
         is_clickbait_author = author in CLICKBAIT_AUTHORS if author else False
 
-        # Two-stage: decision model owns verdicts, so the generative call
-        # only produces summary + title
-        use_decision_verdicts = bool(self.decision_client and self.decision_model)
+        # Routing: with a probe, decide whether verdicts come from the
+        # decision stage (confident band) or the generative JSON (ambiguous
+        # band or no probe). Without decision stage configured at all, the
+        # generative JSON always carries verdicts.
+        decision_available = bool(self.decision_client and self.decision_model)
+        if probe is not None and decision_available:
+            ad_p = probe.get("ad_probability")
+            confident = (
+                ad_p is None
+                or ad_p >= self.decision_threshold
+                or ad_p < DECISION_AMBIGUOUS_LOW
+            )
+            use_probe_verdicts = confident
+        else:
+            use_probe_verdicts = False
+
+        use_decision_verdicts = (
+            use_probe_verdicts
+            or (decision_available and probe is None)
+        )
         ad_instruction = (
             "Determine if it is an advertisement or sponsored content"
             if self.enable_ad_detection and not use_decision_verdicts
@@ -516,9 +580,12 @@ class DomainTextProcessor:
                 generated_title = generated_title[:77] + "..."
 
             if use_decision_verdicts:
-                # Decision stage supplies verdicts (already computed with the
-                # original title/excerpt below)
-                verdicts = self._gather_verdicts(text, title, author)
+                # Decision stage supplies verdicts; use the pre-computed
+                # probe when available (no second system_one request)
+                verdicts = self._gather_verdicts(
+                    text, title, author,
+                    probe=probe if use_probe_verdicts else None,
+                )
                 result = {
                     "summary": summary,
                     "title": generated_title,

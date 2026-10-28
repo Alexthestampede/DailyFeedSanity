@@ -259,6 +259,12 @@ class HTMLGenerator:
         is_clickbait = article.get('is_clickbait', False)
         clickbait_detected_by = article.get('clickbait_detected_by')
         is_ad = article.get('is_ad', False)
+        prefiltered = article.get('prefiltered', False)
+
+        # Pre-filtered ads arrive without an AI summary; surface why instead
+        # of rendering an empty summary block
+        if not summary and prefiltered:
+            summary = "Pre-filtered as an advertisement (decision model); summary skipped."
 
         # Format date
         if isinstance(date, datetime):

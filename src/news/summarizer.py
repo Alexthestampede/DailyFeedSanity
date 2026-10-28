@@ -5,6 +5,7 @@ from .article_extractor import ArticleExtractor
 from .content_cleaner import ContentCleaner
 from ..feed_processor.feed_language_detector import FeedLanguageDetector
 from ..utils.logging_config import get_logger
+from ..config import DECISION_AD_DROP_THRESHOLD
 
 logger = get_logger(__name__)
 
@@ -92,6 +93,36 @@ class NewsSummarizer:
             # Clean title
             cleaned_title = self.cleaner.clean_title(article_data['title'])
 
+            # Stage 0: decision-model pre-filter (drop pure ads before any
+            # generative call; ~0.5s probe vs 10-25s summarization)
+            probe = None
+            if hasattr(self.text_client, "probe_verdicts"):
+                probe = self.text_client.probe_verdicts(cleaned_title, cleaned_text)
+                ad_p = (probe or {}).get("ad_probability")
+                if ad_p is not None and ad_p >= DECISION_AD_DROP_THRESHOLD:
+                    logger.info(
+                        f"Pre-filter: pure ad (p={ad_p:.3f}), skipping summarization "
+                        f"for {feed_name}: {cleaned_title[:50]}..."
+                    )
+                    return {
+                        'success': True,
+                        'feed_name': feed_name,
+                        'original_title': cleaned_title,
+                        'generated_title': cleaned_title,
+                        'summary': '',
+                        'url': article_data['url'],
+                        'author': article_data.get('author'),
+                        'date': article_data.get('date'),
+                        'is_clickbait': False,
+                        'clickbait_detected_by': None,
+                        'is_ad': True,
+                        'ad_probability': ad_p,
+                        'word_count': validation['word_count'],
+                        'source': article_data.get('source', 'extracted'),
+                        'language': language,
+                        'prefiltered': True,
+                    }
+
             # Summarize with AI (pass language parameter)
             # Try single-call JSON workflow first; fall back to multi-call
             summary_data = None
@@ -100,7 +131,8 @@ class NewsSummarizer:
                     text=cleaned_text,
                     title=cleaned_title,
                     author=article_data.get('author'),
-                    language=language
+                    language=language,
+                    probe=probe,
                 )
                 if not summary_data:
                     logger.info(
@@ -137,6 +169,8 @@ class NewsSummarizer:
                 'is_clickbait': summary_data.get('is_clickbait', False),
                 'clickbait_detected_by': summary_data.get('clickbait_detected_by'),
                 'is_ad': summary_data.get('is_ad', False),
+                'clickbait_probability': summary_data.get('clickbait_probability'),
+                'ad_probability': summary_data.get('ad_probability'),
                 'word_count': validation['word_count'],
                 'source': article_data.get('source', 'extracted'),
                 'language': language  # Store detected language for debugging

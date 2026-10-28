@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-Live test: two-stage processing with d1k32 decision model.
+Live test: two-stage processing with d1k32 decision model + pre-filter.
 
-Stage 1 (generative): Ornith159b55k produces summary + title in one call.
-Stage 2 (decision):   d1k32 produces clickbait/ad verdicts via /v1/systemone.
+Stage 0 (decision): d1k32 probes every article FIRST (~0.5s) - pure ads
+(pre p >= 0.9) are dropped before any generative call.
+Stage 1 (generative): Ornith159b55k produces summary + title.
+Stage 2 (decision):  d1k32 verdicts from the probe (no second request).
 
-Two articles max (respecting the 5-article live-test rule).
+Includes the ollama.com pricing post (previously p(ad)=0.958) to prove
+the pre-filter drops it without a summarization call.
 """
+import time
+from datetime import datetime
+
 import sys
 from pathlib import Path
 
@@ -23,16 +29,16 @@ DECISION_MODEL = "d1k32:latest"
 BASE_URL = "http://192.168.2.150:11434"
 
 ARTICLES = [
-    # One straightforward tech article (expect: clickbait low, ad low)
-    ("https://ollama.com/blog/transparent-pricing", False),
-    # A typical promo-ish feed article: expect decision stage to weigh in
-    ("https://appleinsider.com/articles/26/09/09/dynamic-island-now-shows-three-live-activities", False),
+    # Expected: pre-filter DROP (p(ad) ~0.96) - no generative call
+    "https://ollama.com/blog/transparent-pricing",
+    # Expected: pre-filter PASS (p(ad) ~0.33) - two-stage processing
+    "https://appleinsider.com/articles/26/09/09/dynamic-island-now-shows-three-live-activities",
 ]
 
 
 def main():
     print("=" * 70)
-    print(f"Two-stage test: {GENERATIVE_MODEL} + decision {DECISION_MODEL}")
+    print(f"Pre-filter test: decision {DECISION_MODEL} + generative {GENERATIVE_MODEL}")
     print("=" * 70)
 
     text_proc = OllamaTextProcessor(model=GENERATIVE_MODEL, base_url=BASE_URL)
@@ -45,42 +51,65 @@ def main():
     extractor = ArticleExtractor()
     cleaner = ContentCleaner()
 
+    stats = {"probed": 0, "dropped": 0, "processed": 0}
     results = []
-    for url, expected_flag in ARTICLES:
-        print(f"\n--- {url.split('/')[-1]} ---")
+    for url in ARTICLES:
+        name = url.split("/")[-1]
+        print(f"\n--- {name} ---")
+        t0 = time.time()
         article = extractor.extract_from_url(url)
         if not article:
             print("  SKIP: extraction failed")
             continue
         cleaned = cleaner.clean_text(article["text"])
-        print(f"  extracted {len(cleaned)} chars")
+        t_extract = time.time() - t0
 
-        result = proc.generate_summary_single_call(cleaned, title=article.get("title"))
+        # Stage 0: probe
+        t1 = time.time()
+        probe = proc.probe_verdicts(article.get("title"), cleaned)
+        t_probe = time.time() - t1
+        if not probe:
+            print("  FAIL: probe unavailable")
+            continue
+        stats["probed"] += 1
+        print(f"  probe in {t_probe:.1f}s: p(ad)={probe['ad_probability']:.3f}, "
+              f"p(clickbait)={probe['clickbait_probability']:.3f}")
+
+        # Route like NewsSummarizer.process_article does
+        if probe["ad_probability"] >= 0.9:
+            stats["dropped"] += 1
+            print(f"  DROPPED pre-filter in {t_extract + t_probe:.1f}s total "
+                  f"(generative call skipped)")
+            continue
+
+        t2 = time.time()
+        result = proc.generate_summary_single_call(
+            cleaned, title=article.get("title"), probe=probe)
+        t_gen = time.time() - t2
         if not result:
             print("  FAIL: no result")
             continue
-
+        stats["processed"] += 1
         cp = result.get("clickbait_probability")
         ap = result.get("ad_probability")
-        ad_str = f"{ap:.3f}" if ap is not None else "?"
+        cp_str = f"{cp:.3f}" if cp is not None else "generative"
+        ad_str = f"{ap:.3f}" if ap is not None else "generative"
+        print(f"  processed in {t_gen:.1f}s: clickbait={result['is_clickbait']} "
+              f"(p={cp_str}), ad={result['is_ad']} (p={ad_str})")
         print(f"  title: {result['title'][:60]}")
-        print(f"  summary: {len(result['summary'])} chars, clean")
-        print(f"  verdicts: clickbait={result['is_clickbait']} (p={cp:.3f}), "
-              f"ad={result['is_ad']} (p={ad_str})")
         results.append(result)
 
     print("\n" + "=" * 70)
-    if len(results) < len(ARTICLES):
-        print(f"FAIL: only {len(results)}/{len(ARTICLES)} articles produced results")
+    print(f"stats: probed={stats['probed']}, dropped={stats['dropped']}, "
+          f"processed={stats['processed']}")
+    if stats["dropped"] == 0:
+        print("FAIL: expected the pricing post to be dropped pre-filter")
         return 1
-
-    # Sanity: decision stage was actually used
-    if not all("clickbait_probability" in r for r in results):
-        print("FAIL: decision stage not engaged (no probabilities in results)")
+    if stats["processed"] == 0:
+        print("FAIL: expected the tech article to be processed")
         return 1
-
-    print(f"PASS: {len(results)} articles through two-stage pipeline, "
-          "decision stage engaged, no reasoning leakage")
+    print("PASS: pre-filter dropped pure ad without generative call; "
+          "survivor processed via two-stage with probe reuse")
     return 0
 
 
