@@ -309,6 +309,38 @@ HTML_TEMPLATE = """<!DOCTYPE html>
             font-family: monospace;
         }}
 
+        .prefiltered-item {{
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            border-left: 4px solid #ffc107;
+            border-radius: 6px;
+            padding: 12px 15px;
+            margin-bottom: 10px;
+        }}
+
+        .pf-title a {{
+            font-weight: 600;
+            color: #007bff;
+            text-decoration: none;
+        }}
+
+        .pf-title a:hover {{
+            text-decoration: underline;
+        }}
+
+        .pf-meta {{
+            font-size: 0.9em;
+            color: #6c757d;
+            margin-top: 4px;
+        }}
+
+        .pf-rating {{
+            font-size: 0.85em;
+            font-family: monospace;
+            color: #664d03;
+            margin-top: 4px;
+        }}
+
         footer {{
             margin-top: 40px;
             padding-top: 20px;
@@ -471,6 +503,21 @@ HTML_TEMPLATE = """<!DOCTYPE html>
                 background-color: #3a3a3a;
                 border-color: #484848;
             }}
+
+            .prefiltered-item {{
+                background-color: #343434;
+                border-color: #484848;
+                border-left-color: #ffc107;
+                color: #e0e0e0;
+            }}
+
+            .pf-meta {{
+                color: #a0a0a0;
+            }}
+
+            .pf-rating {{
+                color: #e6d9a8;
+            }}
         }}
 
         @media (max-width: 768px) {{
@@ -516,6 +563,8 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         {articles_section}
 
         {errors_section}
+
+        {prefiltered_section}
 
         <footer>
             <p>Generated on {datetime} by <a href="https://github.com/Alexthestampede/DailyFeedSanity" target="_blank" style="color: #007bff; text-decoration: none;">DailyFeedSanity</a> <span class="version">v{app_version}</span></p>
@@ -603,5 +652,30 @@ UPDATE_BANNER_TEMPLATE = """
         then pick the <strong>Check for updates</strong> option at your convenience.
     </div>
     {commit_list}
+</div>
+"""
+
+PREFILTERED_SECTION_TEMPLATE = """
+<section id="prefiltered">
+    <details>
+        <summary>Pre-filtered ads ({count} skipped by the decision model - click to review)</summary>
+        <div class="content">
+            {items_html}
+        </div>
+    </details>
+</section>
+"""
+
+PREFILTERED_ITEM_TEMPLATE = """
+<div class="prefiltered-item">
+    <div class="pf-title">
+        <a href="{url}" target="_blank">{title}</a> <span class="ad-badge">SPONSORED/AD</span>
+    </div>
+    <div class="pf-meta">
+        {feed_name} | {date} | dropped by {decision_model}
+    </div>
+    <div class="pf-rating">
+        decider ratings: ad p={ad_probability}, clickbait p={clickbait_probability} &mdash; dropped at threshold {threshold}
+    </div>
 </div>
 """

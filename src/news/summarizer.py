@@ -117,6 +117,8 @@ class NewsSummarizer:
                         'clickbait_detected_by': None,
                         'is_ad': True,
                         'ad_probability': ad_p,
+                        'clickbait_probability': probe.get('clickbait_probability'),
+                        'decision_model': getattr(self.text_client, 'decision_model', None),
                         'word_count': validation['word_count'],
                         'source': article_data.get('source', 'extracted'),
                         'language': language,

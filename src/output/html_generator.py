@@ -12,10 +12,18 @@ from .templates import (
     ARTICLE_ITEM_TEMPLATE,
     ERRORS_SECTION_TEMPLATE,
     ERROR_ITEM_TEMPLATE,
-    UPDATE_BANNER_TEMPLATE
+    UPDATE_BANNER_TEMPLATE,
+    PREFILTERED_SECTION_TEMPLATE,
+    PREFILTERED_ITEM_TEMPLATE
 )
 from ..utils.logging_config import get_logger
-from ..config import HTML_TITLE, DATE_FORMAT, DATETIME_FORMAT
+from ..config import (
+    HTML_TITLE,
+    DATE_FORMAT,
+    DATETIME_FORMAT,
+    DECISION_AD_DROP_THRESHOLD,
+)
+from .. import config as app_config
 from .. import config as app_config
 
 logger = get_logger(__name__)
@@ -62,7 +70,14 @@ class HTMLGenerator:
 
             # Generate sections
             comics_html = self._generate_comics_section(comic_results, output_dir)
-            articles_html = self._generate_articles_section(article_results)
+
+            # Split pre-filtered ads out of the main article flow: they live
+            # in their own collapsed section at the bottom so nothing is lost
+            # and the decider can be audited
+            normal_articles = [r for r in article_results if not r.get('prefiltered', False)]
+            prefiltered_articles = [r for r in article_results if r.get('prefiltered', False)]
+            articles_html = self._generate_articles_section(normal_articles)
+            prefiltered_html = self._generate_prefiltered_section(prefiltered_articles)
 
             # Combine feed-level errors with per-item processing failures:
             # feed fetch/parse errors come from the feed manager, article/comic
@@ -75,9 +90,9 @@ class HTMLGenerator:
             )
             errors_html = self._generate_errors_section(item_failures)
 
-            # Count successes
+            # Count successes (pre-filtered entries counted in their own section)
             comics_count = sum(1 for r in comic_results if r.get('success', False))
-            articles_count = sum(1 for r in article_results if r.get('success', False))
+            articles_count = sum(1 for r in normal_articles if r.get('success', False))
             errors_count = len(item_failures)
 
             # Generate final HTML
@@ -92,7 +107,8 @@ class HTMLGenerator:
                 update_banner=update_banner_html,
                 comics_section=comics_html,
                 articles_section=articles_html,
-                errors_section=errors_html
+                errors_section=errors_html,
+                prefiltered_section=prefiltered_html,
             )
 
             # Save to file
@@ -262,7 +278,8 @@ class HTMLGenerator:
         prefiltered = article.get('prefiltered', False)
 
         # Pre-filtered ads arrive without an AI summary; surface why instead
-        # of rendering an empty summary block
+        # of rendering an empty summary block (legacy safety - pre-filtered
+        # items normally live in their own collapsed section)
         if not summary and prefiltered:
             summary = "Pre-filtered as an advertisement (decision model); summary skipped."
 
@@ -340,6 +357,51 @@ class HTMLGenerator:
         )
 
         return section_html
+
+    def _generate_prefiltered_section(self, prefiltered_articles):
+        """
+        Generate the collapsed 'pre-filtered ads' section.
+
+        Each dropped article is listed as-is with the decision model's
+        probabilities so a suboptimal decider can be evaluated and
+        replaced. Nothing is removed from the digest without a trace.
+
+        Args:
+            prefiltered_articles: Article results with 'prefiltered': True
+
+        Returns:
+            HTML string (empty when no pre-filtered items)
+        """
+        if not prefiltered_articles:
+            return ""
+
+        items = []
+        for article in prefiltered_articles:
+            ad_p = article.get('ad_probability')
+            cb_p = article.get('clickbait_probability')
+            date = article.get('date', '')
+            if isinstance(date, datetime):
+                date_str = date.strftime(DATE_FORMAT)
+            else:
+                date_str = str(date) if date else 'Unknown date'
+
+            items.append(PREFILTERED_ITEM_TEMPLATE.format(
+                title=self._escape_html(article.get('original_title') or 'Untitled'),
+                url=self._escape_html(article.get('url', '#')),
+                feed_name=self._escape_html(article.get('feed_name', 'Unknown')),
+                date=self._escape_html(date_str),
+                decision_model=self._escape_html(article.get('decision_model') or 'decision model'),
+                ad_probability=f"{ad_p:.3f}" if ad_p is not None else "n/a",
+                clickbait_probability=f"{cb_p:.3f}" if cb_p is not None else "n/a",
+                threshold=f"{DECISION_AD_DROP_THRESHOLD:.2f}",
+            ))
+
+        items_html = '\n'.join(items)
+
+        return PREFILTERED_SECTION_TEMPLATE.format(
+            count=len(prefiltered_articles),
+            items_html=items_html,
+        )
 
     def _generate_update_banner(self, update_status):
         """
