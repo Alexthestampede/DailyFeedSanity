@@ -567,7 +567,7 @@ HTML_TEMPLATE = """<!DOCTYPE html>
         {prefiltered_section}
 
         <footer>
-            <p>Generated on {datetime} by <a href="https://github.com/Alexthestampede/DailyFeedSanity" target="_blank" style="color: #007bff; text-decoration: none;">DailyFeedSanity</a> <span class="version">v{app_version}</span></p>
+            <p>Generated on {datetime} by <a href="https://github.com/Alexthestampede/DailyFeedSanity" target="_blank" style="color: #007bff; text-decoration: none;">DailyFeedSanity</a> <span class="version">v{app_version}</span>{model_chip}</p>
             <p style="margin-top: 10px; font-size: 0.95em;">A project made possible by <a href="https://claude.ai/code" target="_blank" style="color: #007bff; text-decoration: none;">Claude Code</a></p>
             <p style="margin-top: 15px; font-size: 1em; color: #495057;">
                 Please consider visiting the original sites and supporting the creators who make this content possible.

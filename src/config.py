@@ -6,7 +6,7 @@ import os
 
 # Application version: YYYYMMDD.N scheme (date of the release + release
 # number for that day, starting at .1 each day)
-__version__ = "20261028.4"
+__version__ = "20261028.5"
 
 # AI Provider Configuration
 # Supported providers: 'ollama', 'ollama_cloud', 'lm_studio', 'openai', 'gemini', 'claude'

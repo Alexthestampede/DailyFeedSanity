@@ -41,7 +41,7 @@ class HTMLGenerator:
         pass
 
     def generate(self, processing_results, comic_results, article_results, output_dir,
-                 update_status=None):
+                 update_status=None, main_model=None, decision_model=None):
         """
         Generate HTML page from processing results.
 
@@ -67,6 +67,12 @@ class HTMLGenerator:
             update_banner_html = ""
             if update_status and update_status.get("status") == "behind":
                 update_banner_html = self._generate_update_banner(update_status)
+
+            # Footer chips: main model (and decider when active) so results
+            # from different models/deciders are comparable at a glance
+            model_chip = f' <span class="version">{self._escape_html(main_model)}</span>' if main_model else ""
+            if decision_model:
+                model_chip += f' <span class="version">decider: {self._escape_html(decision_model)}</span>'
 
             # Generate sections
             comics_html = self._generate_comics_section(comic_results, output_dir)
@@ -104,6 +110,7 @@ class HTMLGenerator:
                 articles_count=articles_count,
                 errors_count=errors_count,
                 app_version=app_config.__version__,
+                model_chip=model_chip,
                 update_banner=update_banner_html,
                 comics_section=comics_html,
                 articles_section=articles_html,

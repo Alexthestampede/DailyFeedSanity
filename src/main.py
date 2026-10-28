@@ -282,12 +282,18 @@ def main():
         # Generate HTML output
         logger.info("Generating HTML output...")
         html_generator = HTMLGenerator()
+        # Model identity for the digest footer (comparable across runs)
+        inner_processor = getattr(text_processor, "processor", None)
+        main_model = getattr(inner_processor, "model", None)
+        decision_model = getattr(text_processor, "decision_model", None)
         html_path = html_generator.generate(
             processing_results,
             comic_results,
             article_results,
             output_folder,
             update_status=update_status,
+            main_model=main_model,
+            decision_model=decision_model,
         )
 
         logger.info("="*60)
