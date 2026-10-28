@@ -25,6 +25,7 @@ from ..config import (
     CLICKBAIT_DETECTION_TEMPERATURE,
     CLICKBAIT_AUTHORS,
     AD_DETECTION_TEMPERATURE,
+    DECISION_VERDICT_THRESHOLD,
 )
 
 logger = get_logger(__name__)
@@ -39,17 +40,32 @@ class DomainTextProcessor:
     the underlying generic generate() method.
     """
 
-    def __init__(self, text_processor, enable_ad_detection=True):
+    def __init__(self, text_processor, enable_ad_detection=True,
+                 decision_client=None, decision_model=None,
+                 decision_threshold=None):
         """
         Initialize domain text processor.
 
         Args:
             text_processor: ModuLLe BaseTextProcessor instance (has generate() method)
             enable_ad_detection: Enable ad detection feature (default: True)
+            decision_client: Optional OllamaClient with system_one() access.
+                When set together with decision_model, clickbait/ad verdicts
+                are produced by a decision model (noul probabilities) in a
+                single /v1/systemone request instead of the generative model.
+            decision_model: Decision model name (e.g. 'd1k32:latest', 'clef-flash')
+            decision_threshold: Probability of 'true' above which a verdict
+                is positive (default from config)
         """
         self.processor = text_processor
         self.current_date = datetime.now().strftime("%Y-%m-%d")
         self.enable_ad_detection = enable_ad_detection
+        self.decision_client = decision_client
+        self.decision_model = decision_model
+        self.decision_threshold = (
+            decision_threshold if decision_threshold is not None
+            else DECISION_VERDICT_THRESHOLD
+        )
 
     def generate(self, prompt, system_prompt=None, temperature=0.7, max_tokens=None):
         """
@@ -180,6 +196,158 @@ class DomainTextProcessor:
             logger.error(f"Error in ad detection: {e}")
             return False
 
+    def detect_verdicts_decision(self, title, text):
+        """
+        Produce clickbait/ad verdicts via the decision-model stage.
+
+        One /v1/systemone request answers both questions as noul
+        probabilities on the article's title and excerpt. Probabilities are
+        returned directly - no generated text, no JSON parsing, no
+        chain-of-thought to clean.
+
+        Args:
+            title: Article title
+            text: Article text (first 2000 chars used as state context)
+
+        Returns:
+            dict with 'is_clickbait', 'clickbait_probability',
+            'is_ad', 'ad_probability', or None on error/failure
+        """
+        if not self.decision_client or not self.decision_model:
+            return None
+        if not title:
+            return None
+
+        state = f"{title}\n\n{text[:2000]}"
+
+        questions = {
+            "is_clickbait": {
+                "type": "noul",
+                "instructions": (
+                    "Is this article's title a sensationalized, misleading, "
+                    "or withheld-information clickbait headline rather than "
+                    "straightforward news?"
+                ),
+                "criteria": {
+                    "false": "Straightforward, factual, informative headline",
+                    "true": "Sensationalized, misleading, or clickbait headline",
+                },
+            }
+        }
+        if self.enable_ad_detection:
+            questions["is_ad"] = {
+                "type": "noul",
+                "instructions": (
+                    "Is this article an advertisement, sponsored placement, "
+                    "or promotional content rather than editorial news?"
+                ),
+                "criteria": {
+                    "false": "Regular editorial news content",
+                    "true": "Advertisement, sponsored, or promotional content",
+                },
+            }
+
+        try:
+            logger.info(f"Decision-stage verdicts (model: {self.decision_model})")
+            result = self.decision_client.system_one(
+                model=self.decision_model,
+                state=state,
+                questions=questions,
+            )
+
+            answers = (result or {}).get("answers", {})
+            clickbait_answer = answers.get("is_clickbait", {})
+            clickbait_prob = clickbait_answer.get("noul")
+            if clickbait_prob is None:
+                logger.warning("Decision stage returned no clickbait answer")
+                return None
+
+            verdicts = {
+                "is_clickbait": clickbait_prob >= self.decision_threshold,
+                "clickbait_probability": clickbait_prob,
+                "is_ad": False,
+                "ad_probability": None,
+            }
+            logger.info(
+                f"Decision clickbait p={clickbait_prob:.3f} "
+                f"({title[:50]}...)"
+            )
+
+            if self.enable_ad_detection:
+                ad_answer = answers.get("is_ad", {})
+                ad_prob = ad_answer.get("noul")
+                if ad_prob is not None:
+                    verdicts["is_ad"] = ad_prob >= self.decision_threshold
+                    verdicts["ad_probability"] = ad_prob
+                    logger.info(f"Decision ad p={ad_prob:.3f}")
+
+            return verdicts
+
+        except Exception as e:
+            logger.warning(f"Decision-stage verdicts failed: {e}")
+            return None
+
+    def _gather_verdicts(self, text, title, author):
+        """
+        Determine clickbait/ad verdicts for an article.
+
+        Prefers the decision-model stage when configured (one system_one
+        request, direct probabilities); falls back to legacy generative
+        detection calls (or full-JSON verdicts are supplied by the caller)
+        otherwise.
+
+        Returns:
+            dict with 'is_clickbait', 'clickbait_detected_by', 'is_ad',
+            and optionally 'clickbait_probability'/'ad_probability'
+        """
+        is_clickbait_author = author in CLICKBAIT_AUTHORS if author else False
+
+        decision = self.detect_verdicts_decision(title, text)
+        result = {
+            "is_clickbait": False,
+            "clickbait_detected_by": None,
+            "is_ad": False,
+        }
+
+        if decision is not None:
+            is_clickbait_ai = decision["is_clickbait"]
+            if is_clickbait_author and is_clickbait_ai:
+                result["clickbait_detected_by"] = "both"
+            elif is_clickbait_author:
+                result["clickbait_detected_by"] = "author"
+            elif is_clickbait_ai:
+                result["clickbait_detected_by"] = "decision_model"
+            result["is_clickbait"] = is_clickbait_author or is_clickbait_ai
+            result["is_ad"] = decision["is_ad"]
+            result["clickbait_probability"] = decision["clickbait_probability"]
+            if decision.get("ad_probability") is not None:
+                result["ad_probability"] = decision["ad_probability"]
+            return result
+
+        # Legacy generative path (or decision stage unavailable/failed)
+        is_clickbait_ai = False
+        if title:
+            try:
+                is_clickbait_ai = self.detect_clickbait(title, text)
+            except Exception as e:
+                logger.warning(f"AI clickbait detection failed: {e}")
+
+        if is_clickbait_author and is_clickbait_ai:
+            result["clickbait_detected_by"] = "both"
+        elif is_clickbait_author:
+            result["clickbait_detected_by"] = "author"
+        elif is_clickbait_ai:
+            result["clickbait_detected_by"] = "ai"
+        result["is_clickbait"] = is_clickbait_author or is_clickbait_ai
+
+        if title and self.enable_ad_detection:
+            try:
+                result["is_ad"] = self.detect_ad(title, text)
+            except Exception as e:
+                logger.warning(f"AI ad detection failed: {e}")
+
+        return result
+
     def generate_summary(
         self, text, title=None, author=None, language="English", max_length=500
     ):
@@ -201,33 +369,11 @@ class DomainTextProcessor:
             logger.warning("Empty text provided for summarization")
             return None
 
-        # Clickbait detection
-        is_clickbait_author = author in CLICKBAIT_AUTHORS if author else False
-        is_clickbait_ai = False
-        if title:
-            try:
-                is_clickbait_ai = self.detect_clickbait(title, text)
-            except Exception as e:
-                logger.warning(f"AI clickbait detection failed: {e}")
-
-        is_clickbait = is_clickbait_author or is_clickbait_ai
-
-        if is_clickbait_author and is_clickbait_ai:
-            clickbait_detected_by = "both"
-        elif is_clickbait_author:
-            clickbait_detected_by = "author"
-        elif is_clickbait_ai:
-            clickbait_detected_by = "ai"
-        else:
-            clickbait_detected_by = None
-
-        # Ad detection
-        is_ad = False
-        if title and self.enable_ad_detection:
-            try:
-                is_ad = self.detect_ad(title, text)
-            except Exception as e:
-                logger.warning(f"AI ad detection failed: {e}")
+        # Clickbait/ad verdicts (decision stage when configured, else legacy)
+        verdicts = self._gather_verdicts(text, title, author)
+        is_clickbait = verdicts["is_clickbait"]
+        clickbait_detected_by = verdicts["clickbait_detected_by"]
+        is_ad = verdicts["is_ad"]
 
         logger.info(f"Generating summary in {language}")
 
@@ -269,13 +415,18 @@ class DomainTextProcessor:
             # Generate title from summary
             generated_title = self.generate_title(summary, language=language)
 
-            return {
+            result = {
                 "summary": summary,
                 "title": generated_title,
                 "is_clickbait": is_clickbait,
                 "clickbait_detected_by": clickbait_detected_by,
                 "is_ad": is_ad,
             }
+            if "clickbait_probability" in verdicts:
+                result["clickbait_probability"] = verdicts["clickbait_probability"]
+            if "ad_probability" in verdicts:
+                result["ad_probability"] = verdicts["ad_probability"]
+            return result
 
         except Exception as e:
             logger.error(f"Error generating summary: {e}")
@@ -307,13 +458,18 @@ class DomainTextProcessor:
 
         is_clickbait_author = author in CLICKBAIT_AUTHORS if author else False
 
+        # Two-stage: decision model owns verdicts, so the generative call
+        # only produces summary + title
+        use_decision_verdicts = bool(self.decision_client and self.decision_model)
         ad_instruction = (
             "Determine if it is an advertisement or sponsored content"
-            if self.enable_ad_detection
+            if self.enable_ad_detection and not use_decision_verdicts
             else None
         )
 
-        system_prompt = self._get_single_call_prompt(language, ad_instruction)
+        system_prompt = self._get_single_call_prompt(
+            language, ad_instruction, include_verdicts=not use_decision_verdicts
+        )
         user_prompt = (
             f"Article title: {title or '(none)'}\n\n"
             f"Article text:\n{text[:10000]}\n\n"
@@ -359,7 +515,24 @@ class DomainTextProcessor:
             if len(generated_title) > 80:
                 generated_title = generated_title[:77] + "..."
 
-            # Verdicts: booleans, default to False when missing/unclear
+            if use_decision_verdicts:
+                # Decision stage supplies verdicts (already computed with the
+                # original title/excerpt below)
+                verdicts = self._gather_verdicts(text, title, author)
+                result = {
+                    "summary": summary,
+                    "title": generated_title,
+                    "is_clickbait": verdicts["is_clickbait"],
+                    "clickbait_detected_by": verdicts["clickbait_detected_by"],
+                    "is_ad": verdicts["is_ad"],
+                }
+                if "clickbait_probability" in verdicts:
+                    result["clickbait_probability"] = verdicts["clickbait_probability"]
+                if "ad_probability" in verdicts:
+                    result["ad_probability"] = verdicts["ad_probability"]
+                return result
+
+            # Verdicts come from this same JSON response (no decision model)
             def _to_bool(value):
                 if isinstance(value, bool):
                     return value
@@ -400,7 +573,7 @@ class DomainTextProcessor:
             logger.error(f"Error in single-call summary: {e}")
             return None
 
-    def _get_single_call_prompt(self, language, ad_instruction=None):
+    def _get_single_call_prompt(self, language, ad_instruction=None, include_verdicts=True):
         """
         Get system prompt for the single-call JSON workflow.
 
@@ -408,16 +581,29 @@ class DomainTextProcessor:
             language: Language for the generated summary/title
             ad_instruction: Description of the ad-detection task, or None
                 to ask the model to always report is_ad as false
+            include_verdicts: When False (decision-model stage owns
+                verdicts), the prompt asks only for title + summary
 
         Returns:
             System prompt string
         """
-        ad_rule = (
-            f"- \"is_ad\": true if the article is an advertisement or sponsored "
-            f"content ({ad_instruction}), otherwise false"
-            if ad_instruction
-            else "- \"is_ad\": always false (ad detection is disabled)"
-        )
+        if include_verdicts:
+            clickbait_rule = (
+                "  \"is_clickbait\": true if the article title is clickbait "
+                "(sensationalized, misleading, emotional manipulation, withholding "
+                "key information), otherwise false,\n"
+            )
+            ad_rule = (
+                f"  \"is_ad\": true if the article is an advertisement or sponsored "
+                f"content ({ad_instruction or 'sponsored placement detection'}), otherwise false"
+                if ad_instruction
+                else "  \"is_ad\": always false (ad detection is disabled)"
+            )
+        else:
+            # Decision-model stage supplies verdicts; generative call stays
+            # focused on summary + title
+            clickbait_rule = ""
+            ad_rule = ""
 
         return (
             f"Today is {self.current_date}. "
@@ -429,9 +615,7 @@ class DomainTextProcessor:
             "(max 80 characters, no clickbait language),\n"
             "  \"summary\": an objective, factual summary of the article "
             "(100-300 words, neutral professional tone, focus on key facts),\n"
-            "  \"is_clickbait\": true if the article title is clickbait "
-            "(sensationalized, misleading, emotional manipulation, withholding "
-            "key information), otherwise false,\n"
+            f"{clickbait_rule}"
             f"{ad_rule}\n"
             "}\n"
             f"Write \"title\" and \"summary\" in {language}. "

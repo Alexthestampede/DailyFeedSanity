@@ -1068,6 +1068,8 @@ def display_config_summary(config: Dict):
     print(f"Vision Model: {config.get('vision_model', 'Not configured (optional)')}")
     print(f"Request Timeout: {config.get('request_timeout', 30)}s "
           f"(AI generation: {config.get('request_timeout', 30) * 3}s)")
+    decision_model = config.get("decision_model") or ""
+    print(f"Decision Model: {decision_model if decision_model else '(disabled)'}")
 
     feed_count = len(config.get("rss_feeds", []))
     print(f"RSS Feeds: {feed_count} configured")
@@ -1245,10 +1247,11 @@ def interactive_menu(config: Dict):
         print(" [13] Check for updates")
         print(" [14] Toggle ad detection")
         print(" [15] Set request timeout")
-        print(" [16] Exit")
+        print(" [16] Set decision model (two-stage verdicts)")
+        print(" [17] Exit")
         print()
 
-        choice = input("Select option [1-16]: ").strip()
+        choice = input("Select option [1-17]: ").strip()
 
         if choice == "1":
             # Change AI provider (requires full reconfiguration)
@@ -1440,12 +1443,70 @@ def interactive_menu(config: Dict):
             input("Press Enter to continue...")
 
         elif choice == "16":
+            # Set decision model (two-stage verdicts)
+            current = config.get("decision_model") or ""
+            print(f"\nCurrent decision model: {current or '(disabled)'}")
+            print("\nA decision model (nimble, clef, clef-flash, d1k32, ...) produces")
+            print("clickbait/ad verdicts as direct probabilities via Ollama's")
+            print("/v1/systemone endpoint (Ollama >= 0.35.1), instead of asking the")
+            print("main generative model for verdicts in its JSON.")
+            print("Requires a decision model installed on the Ollama server.")
+            response = get_input(
+                "Enter decision model name (or 'off' to disable)",
+                default=current or "off",
+            ).strip()
+
+            if response.lower() in ("off", "none", "disabled", ""):
+                config["decision_model"] = ""
+                save_config(config)
+                print("\nDecision stage disabled - verdicts come from the main model's JSON.")
+            else:
+                # Validate: probe the server for the model
+                server = config.get("ollama_base_url") or config.get("ollama_cloud_base_url", "")
+                server = f"{server}/v1/systemone" if server else None
+                probe_error = None
+                probe_result = None
+                if server:
+                    try:
+                        import json as _json
+                        import urllib.request
+                        probe_req = urllib.request.Request(
+                            server,
+                            data=_json.dumps({
+                                "model": response,
+                                "state": "probe",
+                                "questions": {"ok": {"type": "noul", "instructions": "ok?"}},
+                            }).encode(),
+                            headers={"Content-Type": "application/json"},
+                        )
+                        with urllib.request.urlopen(probe_req, timeout=15) as resp:
+                            probe_result = _json.loads(resp.read().decode())
+                    except urllib.error.HTTPError as e:
+                        probe_error = f"HTTP {e.code} (model not installed? run: ollama pull {response})"
+                    except Exception as e:
+                        probe_error = str(e)
+
+                if probe_result and "answers" in probe_result:
+                    config["decision_model"] = response
+                    save_config(config)
+                    print(f"\nDecision model set to '{response}' - two-stage verdicts enabled!")
+                elif probe_error:
+                    print(f"\nProbe failed: {probe_error}")
+                    if get_yes_no("Save anyway?", default=False):
+                        config["decision_model"] = response
+                        save_config(config)
+                        print(f"\nDecision model set to '{response}' (untested).")
+                else:
+                    print("\nCould not reach the Ollama server to validate; not saved.")
+            input("Press Enter to continue...")
+
+        elif choice == "17":
             # Exit
             print("\nExiting configuration wizard.")
             break
 
         else:
-            print("\nInvalid option. Please select 1-16.")
+            print("\nInvalid option. Please select 1-17.")
             input("Press Enter to continue...")
 
 
@@ -1502,6 +1563,7 @@ def first_run_setup() -> Optional[Dict]:
     # Feature toggles - set defaults
     config["enable_ad_detection"] = True  # Ad detection enabled by default
     config["request_timeout"] = 30  # Seconds; AI generation uses 3x this value
+    config["decision_model"] = ""  # Disabled: verdicts from the main model's JSON
 
     # Save configuration
     if save_config(config):

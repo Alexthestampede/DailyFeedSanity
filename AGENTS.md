@@ -34,15 +34,16 @@ black .                                   # Format
 
 Settings resolve: `.config.json` (wizard-written) → env vars → `src/config.py` defaults.
 
-- User settings live in `.config.json` (NOT committed): `ai_provider`, `text_model`, `vision_model`, `ollama_base_url`, `enable_ad_detection`, `request_timeout`, API keys.
-- To change AI model/provider/timeout/ad-detection, update `.config.json` via wizard options [1]-[3], [14] toggle ad detection, [15] set request timeout - or edit the JSON directly.
+- User settings live in `.config.json` (NOT committed): `ai_provider`, `text_model`, `vision_model`, `ollama_base_url`, `enable_ad_detection`, `request_timeout`, `decision_model`, API keys.
+- To change AI model/provider/timeout/ad-detection, update `.config.json` via wizard options [1]-[3], [14] toggle ad detection, [15] set request timeout, [16] set decision model - or edit the JSON directly.
 - `request_timeout` (default 30s): HTTP fetches use it directly; **AI generation calls use 3x**. Raise to 300+ for large local models.
 - `ENABLE_AD_DETECTION` in `src/config.py` is only the *default*; the per-instance setting from `.config.json` (`enable_ad_detection`) is what actually gates detection at runtime. Don't "fix" this by reading the constant at the call site.
 
 ## Architecture notes
 
 - **Two AI layers:** `lib/modulle` (vendored generic abstraction, upstream: github.com/Alexthestampede/ModuLLe) provides `BaseAIClient`/`BaseTextProcessor`; `src/ai_client/` wraps it with domain logic (`DomainTextProcessor`: summarization, clickbait/ad detection). Keep application logic in `src/`, keep ModuLLe generic.
-- **News flow:** extract (trafilatura) → single JSON call (title+summary+verdicts) → fallback to legacy 4-call path if JSON parse fails. Detection prompts use only the first 1000 chars; summarization the first 10,000.
+- **Two-stage processing (optional):** with `decision_model` set in `.config.json` (nimble/clef/d1k32 decision models on Ollama >= 0.35.1), verdicts come from one `/v1/systemone` request as direct `noul` probabilities (no generative JSON parsing, no CoT risk); the generative call then produces only summary+title. Without it, verdicts ride in the single JSON call. Threshold: `DECISION_VERDICT_THRESHOLD` in `src/config.py` (0.7); probabilities included in result dicts as `clickbait_probability`/`ad_probability`.
+- **News flow:** extract (trafilatura) → single JSON call (title+summary, + verdicts when no decision model) → fallback to legacy 4-call path if JSON parse fails. Detection prompts use only the first 1000 chars; summarization the first 10,000.
 - **Vendored copy diverges from upstream by import style only:** upstream uses absolute `from modulle.x import y` (assumes pip install); vendored uses package-relative (`from ...utils.x import`). After every sync, run `scripts/sync_modulle.py` which rewrites imports automatically. Hand-editing vendored files risks divergence - port changes upstream first, then sync.
 - **Import-masking trap:** a stale `pip install -e` of ModuLLe 0.1.0 can satisfy `import modulle` in a dev shell and mask broken vendored imports. Verify with `sys.modules['modulle'] = None` before imports (sync script does this). The app's `.venv` has no such shadow.
 - **Concurrency:** feed fetching is parallel (`ThreadPoolExecutor`, `MAX_CONCURRENT_FEEDS=10`); article processing is sequential per article (4 AI calls → 1 with single-call workflow). This is the bottleneck, not fetching.

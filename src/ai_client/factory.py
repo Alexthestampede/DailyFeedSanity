@@ -183,9 +183,26 @@ def create_ai_client() -> Tuple[
         request_timeout=request_timeout,
     )
 
+    # Decision-model stage (optional): when configured, verdicts come from
+    # a /v1/systemone request instead of the generative model's JSON.
+    decision_model = user_config.get("decision_model") if user_config else None
+    decision_client = None
+    if decision_model:
+        if hasattr(client, "system_one"):
+            decision_client = client
+            logger.info(f"Decision stage enabled: {decision_model}")
+        else:
+            logger.warning(
+                f"decision_model '{decision_model}' set but provider client "
+                "does not support system_one; decision stage disabled"
+            )
+
     # Wrap in domain-specific processors
     domain_text = DomainTextProcessor(
-        text_proc, enable_ad_detection=user_config.get("enable_ad_detection", True)
+        text_proc,
+        enable_ad_detection=user_config.get("enable_ad_detection", True),
+        decision_client=decision_client,
+        decision_model=decision_model,
     )
     domain_vision = DomainVisionProcessor(vision_proc) if vision_proc else None
 
@@ -232,6 +249,8 @@ def create_ai_client_with_fallback() -> Tuple[
                     else None
                 )
 
+                decision_model = user_config.get("decision_model") if user_config else None
+
                 client, text_proc, vision_proc = modulle_create(
                     provider="ollama",
                     text_model=app_config.TEXT_MODEL,
@@ -245,6 +264,8 @@ def create_ai_client_with_fallback() -> Tuple[
                     enable_ad_detection=user_config.get("enable_ad_detection", True)
                     if user_config
                     else True,
+                    decision_client=client if decision_model else None,
+                    decision_model=decision_model,
                 )
                 domain_vision = (
                     DomainVisionProcessor(vision_proc) if vision_proc else None

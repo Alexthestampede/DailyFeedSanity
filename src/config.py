@@ -6,7 +6,7 @@ import os
 
 # Application version: YYYYMMDD.N scheme (date of the release + release
 # number for that day, starting at .1 each day)
-__version__ = "20261028.1"
+__version__ = "20261028.2"
 
 # AI Provider Configuration
 # Supported providers: 'ollama', 'ollama_cloud', 'lm_studio', 'openai', 'gemini', 'claude'
@@ -16,6 +16,12 @@ AI_PROVIDER = "ollama"  # Default to Ollama for backward compatibility
 ENABLE_AD_DETECTION = (
     True  # Enable AI-based ad/sponsored content detection (can be overly sensitive)
 )
+
+# Decision-model stage (two-stage processing)
+# When a decision model is configured (.config.json 'decision_model'), verdicts
+# come from one /v1/systemone request returning noul probabilities instead of
+# the generative model's JSON verdicts.
+DECISION_VERDICT_THRESHOLD = 0.7  # Probability of 'true' above which a verdict is positive
 
 # Ollama Configuration
 OLLAMA_BASE_URL = "http://localhost:11434"
