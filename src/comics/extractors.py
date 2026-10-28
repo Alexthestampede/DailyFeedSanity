@@ -324,23 +324,59 @@ class EvilIncExtractor(ComicExtractor):
             response = fetch_url(comic_page_url, session=self.session)
             html_content = response.text
 
-            # Look for the composite image: YYYYMMDD_evil.jpg (NOT evil01-06.png)
-            # This is a full composite of all panels
-            match = re.search(r'(https?://[^"]*wp-content/uploads/\d{4}/\d{2}/\d{8}_evil\.jpg)', html_content)
-
+            # Pattern 1 (legacy): composite image YYYYMMDD_evil.jpg
+            # (NOT evil01-06.png) - full composite of all panels
+            match = re.search(
+                r'(https?://[^"]*wp-content/uploads/\d{4}/\d{2}/\d{8}_evil\.jpg)',
+                html_content,
+            )
             if match:
                 image_url = match.group(1)
                 logger.debug(f"Found Evil Inc composite image: {image_url}")
                 return [image_url]
 
-            # Fallback: try without full URL
-            match = re.search(r'wp-content/uploads/(\d{4}/\d{2}/\d{8}_evil\.jpg)', html_content)
+            # Pattern 1b (legacy, relative URL form)
+            match = re.search(
+                r'wp-content/uploads/(\d{4}/\d{2}/\d{8}_evil\.jpg)',
+                html_content,
+            )
             if match:
                 image_url = f"https://www.evil-inc.com/wp-content/uploads/{match.group(1)}"
                 logger.debug(f"Found Evil Inc composite image (relative): {image_url}")
                 return [image_url]
 
-            logger.warning("Could not find Evil Inc composite comic image")
+            # Pattern 2 (current, 2026 redesign): responsive "unspliced
+            # comic" block - the first wp-content/uploads image inside
+            # #unspliced-comic is the comic (theme assets like blank.gif
+            # live elsewhere and never match)
+            match = re.search(
+                r'id="unspliced-comic"(.*?)</div>',
+                html_content,
+                re.DOTALL | re.IGNORECASE,
+            )
+            if match:
+                image_match = re.search(
+                    r'https://www\.evil-inc\.com/wp-content/uploads/[^"\']+\.(?:png|jpe?g|webp|gif)',
+                    match.group(1),
+                    re.IGNORECASE,
+                )
+                if image_match:
+                    image_url = image_match.group(0)
+                    logger.debug(f"Found Evil Inc unspliced comic image: {image_url}")
+                    return [image_url]
+
+            # Pattern 3 (fallback): og:image - Jetpack CDN variant of the comic
+            match = re.search(
+                r'property="og:image" content="([^"]+)"',
+                html_content,
+                re.IGNORECASE,
+            )
+            if match:
+                image_url = match.group(1)
+                logger.debug(f"Found Evil Inc og:image fallback: {image_url}")
+                return [image_url]
+
+            logger.warning("Could not find Evil Inc comic image")
             return []
 
         except Exception as e:
