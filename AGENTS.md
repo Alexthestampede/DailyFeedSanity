@@ -35,7 +35,7 @@ black .                                   # Format
 Settings resolve: `.config.json` (wizard-written) → env vars → `src/config.py` defaults.
 
 - User settings live in `.config.json` (NOT committed): `ai_provider`, `text_model`, `vision_model`, `ollama_base_url`, `enable_ad_detection`, `request_timeout`, `decision_model`, API keys.
-- To change AI model/provider/timeout/ad-detection, update `.config.json` via wizard options [1]-[3], [14] toggle ad detection, [15] set request timeout, [16] set decision model - or edit the JSON directly.
+- To change AI model/provider/timeout/ad-detection, update `.config.json` via wizard options [1]-[3], [14] toggle ad detection, [15] set request timeout, [16] set decision model (server-list picker + systemone probe) - or edit the JSON directly.
 - `request_timeout` (default 30s): HTTP fetches use it directly; **AI generation calls use 3x**. Raise to 300+ for large local models.
 - `ENABLE_AD_DETECTION` in `src/config.py` is only the *default*; the per-instance setting from `.config.json` (`enable_ad_detection`) is what actually gates detection at runtime. Don't "fix" this by reading the constant at the call site.
 

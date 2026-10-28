@@ -1220,6 +1220,174 @@ def check_for_updates():
         )
 
 
+def _probe_decision_model(server, model_name):
+    """
+    Validate a decision model against the /v1/systemone endpoint.
+
+    Args:
+        server: Ollama base URL (local or ollama.com)
+        model_name: Model name to validate
+
+    Returns:
+        Tuple of (ok, error_message)
+    """
+    import json as _json
+    import urllib.request
+    import urllib.error
+
+    endpoint = f"{server.rstrip('/')}/v1/systemone"
+    try:
+        probe_req = urllib.request.Request(
+            endpoint,
+            data=_json.dumps({
+                "model": model_name,
+                "state": "probe",
+                "questions": {"ok": {"type": "noul", "instructions": "ok?"}},
+            }).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(probe_req, timeout=15) as resp:
+            data = _json.loads(resp.read().decode())
+        if isinstance(data, dict) and "answers" in data:
+            return True, None
+        return False, "Unexpected response from /v1/systemone"
+    except urllib.error.HTTPError as e:
+        return False, (
+            f"HTTP {e.code} (is this a decision model? plain generative models "
+            f"and mistyped names return errors here)"
+        )
+    except Exception as e:
+        return False, str(e)
+
+
+def select_decision_model(config):
+    """
+    Interactive decision-model selection for the two-stage pre-filter.
+
+    Lists models from the Ollama server (numbered picker, consistent with
+    the text/vision model selectors) so the user cannot typo a name, then
+    validates the choice with a live /v1/systemone probe.
+
+    Non-ollama providers keep manual entry: only OllamaClient exposes
+    system_one.
+
+    Args:
+        config: Configuration dictionary
+
+    Returns:
+        Selected model name, "off" to disable, or None on failure
+    """
+    current = config.get("decision_model") or ""
+    print(f"\nCurrent decision model: {current or '(disabled)'}")
+    print("\nA decision model (nimble, clef, clef-flash, d1k32, ...) produces")
+    print("clickbait/ad verdicts as direct probabilities via Ollama's")
+    print("/v1/systemone endpoint (Ollama >= 0.35.1), instead of asking the")
+    print("main generative model for verdicts in its JSON.")
+
+    provider = config.get("ai_provider", "ollama")
+    ollama_based = provider in ("ollama", "ollama_cloud", "ollamacloud")
+
+    server = None
+    if provider == "ollama_cloud" or provider == "ollamacloud":
+        server = None  # ollama.com list endpoint needs auth; skip listing
+    elif ollama_based:
+        server = config.get("ollama_base_url")
+
+    selected = None
+
+    if server:
+        # Grab the list from the server - no typos possible
+        inspector = OllamaInspector(server)
+        models = inspector.list_models()
+
+        if models and isinstance(models, list):
+            # Order decision-family models first so they're easy to spot,
+            # without hiding anything from the list
+            def _is_decision_family(name):
+                lowered = name.lower()
+                return any(k in lowered for k in ("nimble", "clef", "tev", "d1k"))
+
+            sorted_models = sorted(models, key=lambda m: (0 if _is_decision_family(m) else 1, m))
+
+            print(f"\nAvailable models on {server} (decision-family models first):\n")
+            for i, name in enumerate(sorted_models, 1):
+                marker = " <- decision model family" if _is_decision_family(name) else ""
+                current_marker = " [current]" if name == current else ""
+                print(f"  [{i}] {name}{marker}{current_marker}")
+            print(f"  [off] Disable decision stage (verdicts from the main model's JSON)")
+            print()
+
+            while True:
+                raw = get_input(
+                    "Select decision model [number or 'off']",
+                    default=(
+                        str(sorted_models.index(current) + 1)
+                        if current in sorted_models
+                        else "off"
+                    ),
+                ).strip()
+
+                if raw.lower() in ("off", "none", "disabled"):
+                    selected = "off"
+                    break
+                try:
+                    index = int(raw) - 1
+                    if 0 <= index < len(sorted_models):
+                        selected = sorted_models[index]
+                        break
+                    print(f"Please enter a number between 1 and {len(sorted_models)}, or 'off'")
+                except ValueError:
+                    print(f"Please enter a number between 1 and {len(sorted_models)}, or 'off'")
+        else:
+            print("\nCould not list models from the server - falling back to manual entry.")
+            manual = get_input("Enter decision model name (or 'off' to disable)", default=current or "off")
+            selected = "off" if manual.lower() in ("off", "none", "disabled", "") else manual
+    else:
+        # Non-listable providers: manual entry, same as before
+        selected = get_input(
+            f"Enter decision model name for {provider} (or 'off' to disable)",
+            default=current or "off",
+        ).strip()
+        if selected.lower() in ("none", "disabled", ""):
+            selected = "off"
+
+    if not selected:
+        selected = "off"
+
+    if selected == "off":
+        if current:
+            print("\nDecision stage disabled - verdicts come from the main model's JSON.")
+        else:
+            print("\nDecision stage stays disabled.")
+        return "off"
+
+    # Validate with a live probe (guards against picking a generative model)
+    probe_server = server or config.get("ollama_cloud_base_url") or "https://ollama.com"
+    ok, error = _probe_decision_model(probe_server, selected)
+    if ok:
+        print(f"\nProbe OK - '{selected}' answered a systemone request.")
+        return selected
+
+    print(f"\nProbe failed: {error}")
+    if get_yes_no("Save anyway?", default=False):
+        print(f"Saved '{selected}' untested - it will fail gracefully at runtime if invalid.")
+        return selected
+    return None
+
+
+def _run_decision_model_option(config):
+    """Handler for wizard option [16]; saves the selection."""
+    selection = select_decision_model(config)
+    if selection is None:
+        return
+    config["decision_model"] = "" if selection == "off" else selection
+    save_config(config)
+    if selection == "off":
+        print("Decision stage disabled.")
+    else:
+        print(f"Decision model set to '{selection}' - two-stage verdicts enabled!")
+
+
 def interactive_menu(config: Dict):
     """
     Display interactive menu for managing configuration.
@@ -1443,61 +1611,8 @@ def interactive_menu(config: Dict):
             input("Press Enter to continue...")
 
         elif choice == "16":
-            # Set decision model (two-stage verdicts)
-            current = config.get("decision_model") or ""
-            print(f"\nCurrent decision model: {current or '(disabled)'}")
-            print("\nA decision model (nimble, clef, clef-flash, d1k32, ...) produces")
-            print("clickbait/ad verdicts as direct probabilities via Ollama's")
-            print("/v1/systemone endpoint (Ollama >= 0.35.1), instead of asking the")
-            print("main generative model for verdicts in its JSON.")
-            print("Requires a decision model installed on the Ollama server.")
-            response = get_input(
-                "Enter decision model name (or 'off' to disable)",
-                default=current or "off",
-            ).strip()
-
-            if response.lower() in ("off", "none", "disabled", ""):
-                config["decision_model"] = ""
-                save_config(config)
-                print("\nDecision stage disabled - verdicts come from the main model's JSON.")
-            else:
-                # Validate: probe the server for the model
-                server = config.get("ollama_base_url") or config.get("ollama_cloud_base_url", "")
-                server = f"{server}/v1/systemone" if server else None
-                probe_error = None
-                probe_result = None
-                if server:
-                    try:
-                        import json as _json
-                        import urllib.request
-                        probe_req = urllib.request.Request(
-                            server,
-                            data=_json.dumps({
-                                "model": response,
-                                "state": "probe",
-                                "questions": {"ok": {"type": "noul", "instructions": "ok?"}},
-                            }).encode(),
-                            headers={"Content-Type": "application/json"},
-                        )
-                        with urllib.request.urlopen(probe_req, timeout=15) as resp:
-                            probe_result = _json.loads(resp.read().decode())
-                    except urllib.error.HTTPError as e:
-                        probe_error = f"HTTP {e.code} (model not installed? run: ollama pull {response})"
-                    except Exception as e:
-                        probe_error = str(e)
-
-                if probe_result and "answers" in probe_result:
-                    config["decision_model"] = response
-                    save_config(config)
-                    print(f"\nDecision model set to '{response}' - two-stage verdicts enabled!")
-                elif probe_error:
-                    print(f"\nProbe failed: {probe_error}")
-                    if get_yes_no("Save anyway?", default=False):
-                        config["decision_model"] = response
-                        save_config(config)
-                        print(f"\nDecision model set to '{response}' (untested).")
-                else:
-                    print("\nCould not reach the Ollama server to validate; not saved.")
+            # Set decision model (two-stage verdicts) - picker + probe
+            _run_decision_model_option(config)
             input("Press Enter to continue...")
 
         elif choice == "17":
