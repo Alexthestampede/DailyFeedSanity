@@ -7,6 +7,8 @@ from ..feed_processor.feed_language_detector import FeedLanguageDetector
 from ..utils.logging_config import get_logger
 from ..config import DECISION_AD_DROP_THRESHOLD, DECISION_PROBE_BATCH_SIZE
 
+import time
+
 logger = get_logger(__name__)
 
 
@@ -97,7 +99,9 @@ class NewsSummarizer:
                 'entry': entry,
                 'feed_name': feed_name,
                 'feed_url': feed_data.get('feed_url', ''),
-                'language': feed_data.get('language') or 'English',
+                # None = resolve lazily in stage 3 (cached per feed) so the
+                # generative model is not loaded during extraction/probing
+                'language': feed_data.get('language'),
                 'article_data': article_data,
                 'cleaned_text': cleaned_text,
                 'cleaned_title': cleaned_title,
@@ -221,7 +225,7 @@ class NewsSummarizer:
             'decision_model': getattr(self.text_client, 'decision_model', None),
             'word_count': item['validation']['word_count'],
             'source': item['article_data'].get('source', 'extracted'),
-            'language': item['language'],
+            'language': item.get('language') or 'English',
             'prefiltered': True,
         }
 
@@ -236,10 +240,23 @@ class NewsSummarizer:
             Result dict with processed article, or failure dict on error
         """
         feed_name = item['feed_name']
-        language = item['language']
         cleaned_text = item['cleaned_text']
         cleaned_title = item['cleaned_title']
         article_data = item['article_data']
+
+        # Stage 3 is the generative window: resolve feed language lazily here
+        # (cached per feed, so normally zero extra model calls)
+        language = item.get('language')
+        if not language:
+            try:
+                language = self.language_detector.get_feed_language(
+                    item.get('feed_url', ''),
+                    feed_data=item.get('feed_data_ref', {}).get('feed_data'),
+                )
+            except Exception as e:
+                logger.warning(f"Language detection failed for {feed_name}: {e}; assuming English")
+                language = 'English'
+            item['language'] = language
 
         try:
             # Try single-call JSON workflow first; fall back to multi-call
@@ -349,14 +366,15 @@ class NewsSummarizer:
 
     def batch_process(self, news_feeds):
         """
-        Process multiple news articles with a staged, batched pipeline.
+        Process news articles with a globally staged pipeline.
 
-        Stages per feed:
-        1. Extract + clean everything (no AI)
-        2. Decision-model probes in concurrent batches - one model-load
-           window, pure ads dropped here, zero generative calls so far
-        3. Survivors summarized sequentially - the generative model loads
-           once instead of ping-ponging against the decision model
+        Stages span ALL feeds, not one feed at a time - each model loads once
+        per run instead of ping-ponging per feed:
+        1. Extract + clean every entry from every feed (no AI)
+        2. Decision-model probes for everything, in concurrent batches -
+           pure ads dropped here, zero generative calls so far
+        3. Summarize all survivors, resolving feed languages lazily so the
+           generative model is loaded only in this window
 
         Args:
             news_feeds: List of feed data dicts (each with multiple entries)
@@ -365,47 +383,50 @@ class NewsSummarizer:
             List of processed articles
         """
         results = []
+        all_items = []
 
+        stage1_start = time.time()
+
+        # Stage 1: extract + clean everything (no AI)
         for feed_data in news_feeds:
-            # Each feed_data now contains 'entries' (plural) instead of 'entry'
             entries = feed_data.get('entries', [])
             feed_name = feed_data.get('feed_name', 'Unknown')
-            feed_url = feed_data.get('feed_url', '')
 
-            # Detect language ONCE per feed (not per article)
-            language = self.language_detector.get_feed_language(
-                feed_url,
-                feed_data=feed_data.get('feed_data')  # Original parsed feed data
-            )
+            logger.info(f"Stage 1: preparing {len(entries)} article(s) from {feed_name}")
 
-            logger.info(f"Processing {len(entries)} articles from {feed_name} (language: {language})")
-
-            # Stage 1: extract + clean (no AI)
-            items = []
             for entry in entries:
                 single_entry_data = {
                     **feed_data,
-                    'entry': entry,     # Pass single entry
-                    'language': language,  # Pass pre-detected language
+                    'entry': entry,
+                    # Language is resolved lazily in stage 3 (cached per feed)
+                    'language': feed_data.get('language'),
                 }
                 prepared = self._prepare_article(single_entry_data)
                 if prepared['failed_result'] is not None:
                     results.append(prepared['failed_result'])
                 elif prepared['item'] is not None:
-                    items.append(prepared['item'])
+                    # Keep a reference for lazy language detection
+                    prepared['item']['feed_data_ref'] = feed_data
+                    all_items.append(prepared['item'])
 
-            if not items:
-                continue
+        stage1_elapsed = time.time() - stage1_start
+        logger.info(f"Stage 1 complete: {len(all_items)} article(s) prepared, "
+                    f"{len(results)} failed ({stage1_elapsed:.1f}s)")
 
-            # Stage 2: decision probes (batches; drops pure ads here)
-            self._probe_batch(items)
+        if all_items:
+            # Stage 2: decision probes for ALL items (batches, model loads once)
+            stage2_start = time.time()
+            self._probe_batch(all_items)
+            logger.info(f"Stage 2 complete ({time.time() - stage2_start:.1f}s)")
 
-            # Stage 3: generative processing of survivors only
-            for item in items:
+            # Stage 3: generative processing of survivors (model loads once)
+            stage3_start = time.time()
+            for item in all_items:
                 if item['dropped']:
                     results.append(self._prefiltered_result(item))
                 else:
                     results.append(self._summarize_item(item))
+            logger.info(f"Stage 3 complete ({time.time() - stage3_start:.1f}s)")
 
         # Summary
         successful = sum(1 for r in results if r.get('success', False))

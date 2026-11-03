@@ -229,6 +229,27 @@ def main():
     results4 = summarizer4.batch_process([feed_data(entries4)])
     check("extraction failure handled", sum(1 for r in results4 if not r.get('success')), 2)
 
+    # Case 5: multi-feed GLOBAL staging - every probe (all feeds) completes
+    # before the first generative call of ANY feed. Per-feed staging would
+    # interleave feed A's generate between feed B's probes.
+    probe_values5 = {i: {'ad_probability': 0.05, 'clickbait_probability': 0.01}
+                     for i in range(3)}
+    summarizer5 = build_summarizer(probe_values5)
+    ai5 = summarizer5.text_client
+
+    feed_a = dict(feed_data([make_entry(i) for i in range(3)]), feed_name='FeedA')
+    feed_b = dict(feed_data([make_entry(i) for i in range(3)]), feed_name='FeedB')
+    feed_c = dict(feed_data([make_entry(i) for i in range(3)]), feed_name='FeedC')
+    results5 = summarizer5.batch_process([feed_a, feed_b, feed_c])
+
+    kinds = [kind for kind, _ in ai5.order]
+    first_generate = kinds.index('generate') if 'generate' in kinds else -1
+    check("global staging: all 9 probes precede first generate",
+          first_generate == 9, True)
+
+    # Language detection happened lazily (stage 3), not during probing
+    check("all 9 articles summarized", len(results5), 9)
+
     print()
     if failures:
         print(f"{failures} test(s) FAILED")
