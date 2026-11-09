@@ -77,6 +77,7 @@ def build_summarizer(probe_values, fail_probe_for=None, decision_stage=True):
             if decision_stage:
                 self.decision_client = object()
                 self.decision_model = 'mock-decider:latest'
+            self.probe_attempts = 0  # total system_one calls (incl. failures)
 
         @staticmethod
         def _idx(title):
@@ -85,6 +86,7 @@ def build_summarizer(probe_values, fail_probe_for=None, decision_stage=True):
 
         def probe_verdicts(self, title, text):
             idx = self._idx(title)
+            self.probe_attempts += 1
             with self._lock:
                 self._current += 1
                 self.peak_probe_concurrency = max(
@@ -100,8 +102,11 @@ def build_summarizer(probe_values, fail_probe_for=None, decision_stage=True):
 
         def generate_summary_single_call(self, text, title=None, author=None,
                                          language='English', max_length=500,
-                                         probe=None):
+                                         probe=None, use_decision_model=True):
             idx = self._idx(title)
+            # Strict phasing: staged callers must forbid decider calls here
+            assert use_decision_model is False, (
+                "stage 3 must pass use_decision_model=False")
             self.calls['single_calls'].append(idx)
             self.order.append(('generate', idx))
             return {
@@ -114,8 +119,11 @@ def build_summarizer(probe_values, fail_probe_for=None, decision_stage=True):
                 'clickbait_probability': probe.get('clickbait_probability') if probe else None,
             }
 
-        def generate_summary(self, text, title=None, author=None, language='English'):
+        def generate_summary(self, text, title=None, author=None, language='English',
+                             probe=None, use_decision_model=True):
             idx = self._idx(title)
+            assert use_decision_model is False, (
+                "stage 3 must pass use_decision_model=False")
             self.calls['legacy_calls'].append(idx)
             self.order.append(('generate', idx))
             return {
@@ -185,6 +193,11 @@ def main():
                                        min(generate_positions) >= N),
           True)
 
+    # Phase-leak guard: exactly one probe attempt per item - ambiguous-band
+    # items (2, 9) and everything else use their stage-2 probe in stage 3;
+    # the decider is never re-invoked while the LLM is loaded.
+    check("no decider calls leaked into stage 3", ai.probe_attempts, N)
+
     check("2 ads dropped pre-filter (0.95, 0.92)",
           sum(1 for r in results if r.get('prefiltered')), 2)
 
@@ -194,6 +207,15 @@ def main():
     check("dropped items made zero generative calls",
           sorted(set(ai.calls['single_calls']) | set(ai.calls['legacy_calls'])),
           [0, 2, 3, 4, 5, 7, 8, 9])
+
+    # Confident-band survivors must carry their stage-2 probe probabilities in
+    # the result (regression: a routing bug silently sent them to full JSON)
+    low_band_result = next(r for r in results
+                           if r.get('summary', '').startswith('Summary of article 0'))
+    check("confident survivor carries probe probabilities",
+          (low_band_result.get('ad_probability') is not None
+           and low_band_result.get('clickbait_probability') is not None),
+          True)
 
     check("peak probe concurrency observed >1 (batching works)",
           ai.peak_probe_concurrency > 1, True)
@@ -205,6 +227,8 @@ def main():
     results2 = summarizer2.batch_process([feed_data([make_entry(i) for i in range(5)])])
     check("probe failure item still summarized",
           sum(1 for r in results2 if r.get('success') and r.get('summary')), 5)
+    check("probe failure: no decider retry in stage 3",
+          summarizer2.text_client.probe_attempts, 5)
     failed_probe_result = next(
         (r for r in results2 if r.get('summary', '').startswith('Summary of article 2')),
         None)

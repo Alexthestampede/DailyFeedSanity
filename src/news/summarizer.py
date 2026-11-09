@@ -259,7 +259,10 @@ class NewsSummarizer:
             item['language'] = language
 
         try:
-            # Try single-call JSON workflow first; fall back to multi-call
+            # Try single-call JSON workflow first; fall back to multi-call.
+            # Stage 3 is the generative window: use_decision_model=False keeps
+            # every system_one call in stage 2, so the decider model is never
+            # loaded while the LLM is resident (no model thrash).
             summary_data = None
             if hasattr(self.text_client, "generate_summary_single_call"):
                 summary_data = self.text_client.generate_summary_single_call(
@@ -268,6 +271,7 @@ class NewsSummarizer:
                     author=article_data.get('author'),
                     language=language,
                     probe=item.get('probe'),
+                    use_decision_model=False,
                 )
                 if not summary_data:
                     logger.info(
@@ -279,7 +283,9 @@ class NewsSummarizer:
                     text=cleaned_text,
                     title=cleaned_title,
                     author=article_data.get('author'),
-                    language=language
+                    language=language,
+                    probe=item.get('probe'),
+                    use_decision_model=False,
                 )
 
             if not summary_data:

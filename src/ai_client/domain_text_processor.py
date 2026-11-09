@@ -310,20 +310,23 @@ class DomainTextProcessor:
 
         return verdicts
 
-    def _gather_verdicts(self, text, title, author, probe=None):
+    def _gather_verdicts(self, text, title, author, probe=None, use_decision_model=True):
         """
         Determine clickbait/ad verdicts for an article.
 
-        Uses a pre-computed probe when supplied (avoids a second
-        system_one request); otherwise asks the decision-model stage,
-        falling back to legacy generative detection calls when the
-        decision stage is unavailable or failed.
+        Uses a pre-computed probe when supplied (no extra system_one
+        request). Without a probe, asks the decision-model stage only when
+        use_decision_model is True - staged callers pass False so that ALL
+        decider usage stays in the probe stage and the generative window
+        never pays a model switch.
 
         Args:
             text: Article text
             title: Article title
             author: Article author (for clickbait-author override)
             probe: Optional raw probabilities dict from probe_verdicts()
+            use_decision_model: Allow a live system_one call when probe is
+                absent (False in the staged/generative phase)
 
         Returns:
             dict with 'is_clickbait', 'clickbait_detected_by', 'is_ad',
@@ -341,8 +344,10 @@ class DomainTextProcessor:
                 ),
                 "ad_probability": probe.get("ad_probability"),
             }
-        else:
+        elif use_decision_model:
             decision = self.detect_verdicts_decision(title, text)
+        else:
+            decision = None  # generative phase: no decider calls allowed
         result = {
             "is_clickbait": False,
             "clickbait_detected_by": None,
@@ -389,7 +394,8 @@ class DomainTextProcessor:
         return result
 
     def generate_summary(
-        self, text, title=None, author=None, language="English", max_length=500
+        self, text, title=None, author=None, language="English", max_length=500,
+        probe=None, use_decision_model=True,
     ):
         """
         Generate a summary of the article text.
@@ -400,6 +406,10 @@ class DomainTextProcessor:
             author: Article author (for clickbait detection)
             language: Language to use for the summary
             max_length: Maximum summary length in characters
+            probe: Optional decision-probe probabilities (avoids decider calls)
+            use_decision_model: Allow system_one calls when probe is absent.
+                Staged callers pass False - decider usage stays in the probe
+                stage only.
 
         Returns:
             dict with 'summary', 'title', 'is_clickbait', 'clickbait_detected_by', 'is_ad',
@@ -409,8 +419,12 @@ class DomainTextProcessor:
             logger.warning("Empty text provided for summarization")
             return None
 
-        # Clickbait/ad verdicts (decision stage when configured, else legacy)
-        verdicts = self._gather_verdicts(text, title, author)
+        # Clickbait/ad verdicts (probe > decision stage > legacy generative)
+        verdicts = self._gather_verdicts(
+            text, title, author,
+            probe=probe,
+            use_decision_model=use_decision_model,
+        )
         is_clickbait = verdicts["is_clickbait"]
         clickbait_detected_by = verdicts["clickbait_detected_by"]
         is_ad = verdicts["is_ad"]
@@ -474,7 +488,7 @@ class DomainTextProcessor:
 
     def generate_summary_single_call(
         self, text, title=None, author=None, language="English", max_length=500,
-        probe=None,
+        probe=None, use_decision_model=True,
     ):
         """
         Generate summary + title + clickbait/ad verdicts in ONE AI call.
@@ -494,6 +508,9 @@ class DomainTextProcessor:
             max_length: Maximum summary length in characters
             probe: Optional dict from probe_verdicts() with raw
                 'clickbait_probability'/'ad_probability'
+            use_decision_model: Allow system_one calls when no probe is
+                supplied. Staged callers pass False: the decider runs only in
+                the probe stage, never while the generative model is loaded.
 
         Returns:
             dict with 'summary', 'title', 'is_clickbait', 'clickbait_detected_by',
@@ -505,12 +522,11 @@ class DomainTextProcessor:
 
         is_clickbait_author = author in CLICKBAIT_AUTHORS if author else False
 
-        # Routing: with a probe, decide whether verdicts come from the
-        # decision stage (confident band) or the generative JSON (ambiguous
-        # band or no probe). Without decision stage configured at all, the
-        # generative JSON always carries verdicts.
-        decision_available = bool(self.decision_client and self.decision_model)
-        if probe is not None and decision_available:
+        # Routing: probe verdicts require only a configured decision stage
+        # (no model call); live decider calls additionally require
+        # use_decision_model=True (False in the staged/generative phase).
+        decision_configured = bool(self.decision_client and self.decision_model)
+        if probe is not None and decision_configured:
             ad_p = probe.get("ad_probability")
             confident = (
                 ad_p is None
@@ -523,7 +539,7 @@ class DomainTextProcessor:
 
         use_decision_verdicts = (
             use_probe_verdicts
-            or (decision_available and probe is None)
+            or (decision_configured and use_decision_model and probe is None)
         )
         ad_instruction = (
             "Determine if it is an advertisement or sponsored content"
@@ -580,11 +596,13 @@ class DomainTextProcessor:
                 generated_title = generated_title[:77] + "..."
 
             if use_decision_verdicts:
-                # Decision stage supplies verdicts; use the pre-computed
-                # probe when available (no second system_one request)
+                # Decision-stage verdicts: from the pre-computed probe when
+                # present; otherwise only if this caller allows decider calls
+                # (staged callers pass use_decision_model=False)
                 verdicts = self._gather_verdicts(
                     text, title, author,
-                    probe=probe if use_probe_verdicts else None,
+                    probe=probe,
+                    use_decision_model=use_decision_model,
                 )
                 result = {
                     "summary": summary,
