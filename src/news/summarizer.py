@@ -423,7 +423,14 @@ class NewsSummarizer:
             # Stage 2: decision probes for ALL items (batches, model loads once)
             stage2_start = time.time()
             self._probe_batch(all_items)
-            logger.info(f"Stage 2 complete ({time.time() - stage2_start:.1f}s)")
+            stage2_elapsed = time.time() - stage2_start
+            logger.info(f"Stage 2 complete ({stage2_elapsed:.1f}s)")
+
+            # Free the decider's VRAM before the LLM loads - otherwise both
+            # compete and the generative model spills into system RAM
+            unload = getattr(self.text_client, "unload_decision_model", None)
+            if callable(unload):
+                unload()
 
             # Stage 3: generative processing of survivors (model loads once)
             stage3_start = time.time()

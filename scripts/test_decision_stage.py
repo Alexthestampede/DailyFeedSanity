@@ -222,6 +222,41 @@ def main():
         ARTICLE_TEXT, title=ARTICLE_TITLE, probe=probe_low2)
     check("no decision stage: probe harmless", result is not None, True)
 
+    # 13. unload_decision_model: frees decider VRAM, no-ops without decider
+    class MockDecisionWithUnload(MockDecisionClient):
+        def __init__(self):
+            super().__init__()
+            self.unloaded = []
+
+        def unload_model(self, model):
+            self.unloaded.append(model)
+            return True
+
+    dc = MockDecisionWithUnload()
+    proc = DomainTextProcessor(
+        MockGenerativeSingleCall(), enable_ad_detection=True,
+        decision_client=dc, decision_model="d1k32:latest",
+        decision_threshold=0.7,
+    )
+    check("unload called with decision model name",
+          (proc.unload_decision_model() is True
+           and dc.unloaded == ["d1k32:latest"]), True)
+
+    proc_no_decider = DomainTextProcessor(MockGenerativeSingleCall(), enable_ad_detection=True)
+    check("unload no-ops without decision stage",
+          proc_no_decider.unload_decision_model(), True)
+
+    # 14. unload failure is tolerated (never raises)
+    class MockDecisionBadUnload(MockDecisionClient):
+        def unload_model(self, model):
+            raise RuntimeError("server gone")
+
+    proc_bad = DomainTextProcessor(
+        MockGenerativeSingleCall(), enable_ad_detection=True,
+        decision_client=MockDecisionBadUnload(), decision_model="d1k32:latest",
+    )
+    check("unload error tolerated", proc_bad.unload_decision_model(), False)
+
     print()
     if failures:
         print(f"{failures} test(s) FAILED")

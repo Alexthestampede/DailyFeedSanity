@@ -77,6 +77,10 @@ def build_summarizer(probe_values, fail_probe_for=None, decision_stage=True):
             if decision_stage:
                 self.decision_client = object()
                 self.decision_model = 'mock-decider:latest'
+            else:
+                # No decision stage -> no VRAM to free (mirrors the real
+                # no-op path in DomainTextProcessor.unload_decision_model)
+                self.unload_decision_model = None
             self.probe_attempts = 0  # total system_one calls (incl. failures)
 
         @staticmethod
@@ -133,6 +137,12 @@ def build_summarizer(probe_values, fail_probe_for=None, decision_stage=True):
                 'clickbait_detected_by': None,
                 'is_ad': False,
             }
+
+        def unload_decision_model(self):
+            """Mirror DomainTextProcessor: free decider VRAM between stages."""
+            self.order.append(('unload_decider', None))
+            self.calls['unloads'] = self.calls.get('unloads', 0) + 1
+            return True
 
     summarizer = NewsSummarizer(text_processor=MockAIClient())
     summarizer.extractor = MockExtractor()
@@ -267,12 +277,29 @@ def main():
     results5 = summarizer5.batch_process([feed_a, feed_b, feed_c])
 
     kinds = [kind for kind, _ in ai5.order]
-    first_generate = kinds.index('generate') if 'generate' in kinds else -1
+    probe_positions = [i for i, k in enumerate(kinds) if k == 'probe']
+    gen_positions = [i for i, k in enumerate(kinds) if k == 'generate']
     check("global staging: all 9 probes precede first generate",
-          first_generate == 9, True)
+          len(probe_positions) == 9 and bool(gen_positions)
+          and max(probe_positions) < min(gen_positions),
+          True)
 
     # Language detection happened lazily (stage 3), not during probing
     check("all 9 articles summarized", len(results5), 9)
+
+    # VRAM hygiene: the decider must be unloaded AFTER the last probe and
+    # BEFORE the first generative call, so the two models never co-reside
+    order_kinds = [kind for kind, _ in ai.order]
+    last_probe_pos = max(i for i, k in enumerate(order_kinds) if k == 'probe')
+    first_gen_pos = order_kinds.index('generate')
+    unload_positions = [i for i, k in enumerate(order_kinds) if k == 'unload_decider']
+    check("decider unloaded exactly once", len(unload_positions), 1)
+    check("decider unloaded between probe and summary stages",
+          bool(unload_positions) and last_probe_pos < unload_positions[0] < first_gen_pos,
+          True)
+
+    # No decision stage -> no unload call (nothing to free)
+    check("no unload when no decider", summarizer3.text_client.calls.get('unloads', 0), 0)
 
     print()
     if failures:

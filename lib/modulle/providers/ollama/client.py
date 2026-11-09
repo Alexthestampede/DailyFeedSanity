@@ -79,6 +79,46 @@ class OllamaClient:
             logger.error(f"Failed to list models: {e}")
             return []
 
+    def unload_model(self, model, timeout=None):
+        """
+        Unload a model from memory immediately (frees its VRAM).
+
+        Useful when switching between models (e.g. a decision model and a
+        generative model) that would otherwise compete for VRAM and force one
+        of them to run partially in system RAM.
+
+        Args:
+            model: Model name to unload
+            timeout: Request timeout in seconds (defaults to request_timeout)
+
+        Returns:
+            True if the unload request succeeded, False on error
+        """
+        try:
+            response = requests.post(
+                f"{self.api_url}/generate",
+                json={"model": model, "keep_alive": 0},
+                timeout=timeout if timeout is not None else self.request_timeout,
+                headers=self._headers,
+            )
+            if not response.ok:
+                logger.warning(
+                    f"Failed to unload model {model}: HTTP {response.status_code}"
+                )
+                return False
+            data = response.json()
+            if data.get("done_reason") == "unload" or data.get("done"):
+                logger.info(f"Unloaded model: {model}")
+                return True
+            logger.debug(f"Unload request for {model} returned: {data}")
+            return True
+        except requests.exceptions.RequestException as e:
+            logger.warning(f"Failed to unload model {model}: {e}")
+            return False
+        except Exception as e:
+            logger.warning(f"Unexpected error unloading model {model}: {e}")
+            return False
+
     def generate(self, model, prompt, system=None, temperature=0.3, images=None):
         """
         Generate text using Ollama.

@@ -310,6 +310,33 @@ class DomainTextProcessor:
 
         return verdicts
 
+    def unload_decision_model(self):
+        """
+        Unload the decision model from the Ollama server, freeing its VRAM.
+
+        Called after the probe stage so the decider does not compete for
+        VRAM with the generative model (which would otherwise spill into
+        system RAM and run much slower).
+
+        Returns:
+            True if unloaded (or no decision stage configured), False on error
+        """
+        if not self.decision_client or not self.decision_model:
+            return True
+        unload = getattr(self.decision_client, "unload_model", None)
+        if not callable(unload):
+            return True
+        try:
+            ok = bool(unload(self.decision_model))
+            if ok:
+                logger.info(f"Unloaded decision model: {self.decision_model} (VRAM freed)")
+            else:
+                logger.warning(f"Could not unload decision model: {self.decision_model}")
+            return ok
+        except Exception as e:
+            logger.warning(f"Error unloading decision model {self.decision_model}: {e}")
+            return False
+
     def _gather_verdicts(self, text, title, author, probe=None, use_decision_model=True):
         """
         Determine clickbait/ad verdicts for an article.
