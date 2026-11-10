@@ -212,11 +212,26 @@ def create_ai_client() -> Tuple[
             )
 
     # Wrap in domain-specific processors
+    decision_drop_threshold = None
+    if user_config and user_config.get("decision_ad_drop_threshold") is not None:
+        try:
+            decision_drop_threshold = float(user_config["decision_ad_drop_threshold"])
+            if not (0.0 < decision_drop_threshold <= 1.0):
+                logger.warning(
+                    f"Invalid decision_ad_drop_threshold "
+                    f"{decision_drop_threshold}; must be in (0, 1]. Using default."
+                )
+                decision_drop_threshold = None
+        except (TypeError, ValueError):
+            logger.warning(
+                "Invalid decision_ad_drop_threshold in config; using default"
+            )
     domain_text = DomainTextProcessor(
         text_proc,
         enable_ad_detection=user_config.get("enable_ad_detection", True),
         decision_client=decision_client,
         decision_model=decision_model,
+        decision_drop_threshold=decision_drop_threshold,
     )
     domain_vision = DomainVisionProcessor(vision_proc) if vision_proc else None
 
@@ -294,6 +309,12 @@ def create_ai_client_with_fallback() -> Tuple[
                     else True,
                     decision_client=fallback_decision_client,
                     decision_model=decision_model,
+                    decision_drop_threshold=(
+                        float(user_config["decision_ad_drop_threshold"])
+                        if user_config
+                        and user_config.get("decision_ad_drop_threshold") is not None
+                        else None
+                    ),
                 )
                 domain_vision = (
                     DomainVisionProcessor(vision_proc) if vision_proc else None

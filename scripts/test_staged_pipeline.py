@@ -35,13 +35,15 @@ def make_entry(i):
     }
 
 
-def build_summarizer(probe_values, fail_probe_for=None, decision_stage=True):
+def build_summarizer(probe_values, fail_probe_for=None, decision_stage=True,
+                      drop_threshold=None):
     """
     Build a NewsSummarizer with mocked extractor/cleaner/detector/clients.
 
     probe_values: dict title-index -> probe dict (or None for a failure)
     fail_probe_for: set of indexes whose probes raise
     decision_stage: mock exposes decision_client (probes enabled) or not
+    drop_threshold: mock's decision_drop_threshold (None = don't set)
     """
     from src.news.content_cleaner import ContentCleaner
 
@@ -77,6 +79,8 @@ def build_summarizer(probe_values, fail_probe_for=None, decision_stage=True):
             if decision_stage:
                 self.decision_client = object()
                 self.decision_model = 'mock-decider:latest'
+                if drop_threshold is not None:
+                    self.decision_drop_threshold = drop_threshold
             else:
                 # No decision stage -> no VRAM to free (mirrors the real
                 # no-op path in DomainTextProcessor.unload_decision_model)
@@ -191,7 +195,7 @@ def main():
         8: {'ad_probability': 0.02, 'clickbait_probability': 0.60},   # survive
         9: {'ad_probability': 0.60, 'clickbait_probability': 0.10},   # survive
     }
-    summarizer = build_summarizer(probe_values)
+    summarizer = build_summarizer(probe_values, drop_threshold=0.9)
     ai = summarizer.text_client
     results = summarizer.batch_process([feed_data(entries)])
 
@@ -262,6 +266,20 @@ def main():
     summarizer4.extractor.extract_from_feed_entry = lambda entry, session=None: None
     results4 = summarizer4.batch_process([feed_data(entries4)])
     check("extraction failure handled", sum(1 for r in results4 if not r.get('success')), 2)
+
+    # Case 4b: conservative default threshold (0.97) must NOT drop the
+    # Florence-festival-style false positive (p=0.913); a blatant ad (0.99) drops
+    probe_cases = {
+        0: {'ad_probability': 0.913, 'clickbait_probability': 0.068},  # keep!
+        1: {'ad_probability': 0.990, 'clickbait_probability': 0.05},   # drop
+    }
+    summarizer4b = build_summarizer(probe_cases, drop_threshold=0.97)
+    results4b = summarizer4b.batch_process(
+        [feed_data([make_entry(0), make_entry(1)])])
+    dropped = [r for r in results4b if r.get('prefiltered')]
+    kept = [r for r in results4b if r.get('success') and r.get('summary')]
+    check("0.913 event news kept at 0.97 threshold", len(dropped), 1)
+    check("0.990 pure ad still dropped", len(kept), 1)
 
     # Case 5: multi-feed GLOBAL staging - every probe (all feeds) completes
     # before the first generative call of ANY feed. Per-feed staging would

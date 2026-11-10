@@ -6,7 +6,7 @@ import os
 
 # Application version: YYYYMMDD.N scheme (date of the release + release
 # number for that day, starting at .1 each day)
-__version__ = "20261110.3"
+__version__ = "20261110.4"
 
 # AI Provider Configuration
 # Supported providers: 'ollama', 'ollama_cloud', 'lm_studio', 'openai', 'gemini', 'claude'
@@ -25,7 +25,11 @@ DECISION_VERDICT_THRESHOLD = 0.7  # Probability of 'true' above which a verdict 
 # Pre-filter routing (fast path): probabilities at or above DROP skip the
 # generative model entirely; the band between AMBIGUOUS_LOW and VERDICT_THRESHOLD
 # is treated as ambiguous and the generative model produces the verdicts.
-DECISION_AD_DROP_THRESHOLD = 0.9  # Pure ads: skip summarization pre-filter
+DECISION_AD_DROP_THRESHOLD = 0.97  # Pure ads only: skip summarization pre-filter
+# Conservative on purpose: a false drop hides a real article, while a missed
+# drop only costs one unnecessary summary. Event/promo-sounding news (e.g. a
+# festival report) can score ~0.91 - keep those. Override per install with
+# 'decision_ad_drop_threshold' in .config.json.
 DECISION_AMBIGUOUS_LOW = 0.3  # Below: confident not-ad; above: maybe-ad band starts
 DECISION_PROBE_BATCH_SIZE = 5  # Concurrent decision-model probes per batch (stage 2)
 

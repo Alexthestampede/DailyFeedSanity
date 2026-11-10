@@ -1071,8 +1071,11 @@ def display_config_summary(config: Dict):
     decision_model = config.get("decision_model") or ""
     decision_url = config.get("decision_base_url") or ""
     if decision_model:
+        drop = config.get("decision_ad_drop_threshold")
+        drop_str = f", drop >= {float(drop):.2f}" if drop is not None else ""
         print(f"Decision Model: {decision_model}"
-              + (f" @ {decision_url}" if decision_url else " @ main server"))
+              + (f" @ {decision_url}" if decision_url else " @ main server")
+              + drop_str)
     else:
         print("Decision Model: (disabled)")
 
@@ -1387,13 +1390,35 @@ def select_decision_model(config):
     ok, error = _probe_decision_model(probe_server, selected)
     if ok:
         print(f"\nProbe OK - '{selected}' @ {probe_server} answered a systemone request.")
-        return {"model": selected, "base_url": decision_url}
-
-    print(f"\nProbe failed on {probe_server}: {error}")
-    if get_yes_no("Save anyway?", default=False):
+    else:
+        print(f"\nProbe failed on {probe_server}: {error}")
+        if not get_yes_no("Save anyway?", default=False):
+            return None
         print(f"Saved '{selected}' untested - it will fail gracefully at runtime if invalid.")
-        return {"model": selected, "base_url": decision_url}
-    return None
+
+    # Drop threshold: false drops hide real articles, missed drops only cost
+    # one extra summary, so lean high.
+    current_drop = config.get("decision_ad_drop_threshold")
+    current_drop_str = f"{current_drop}" if current_drop is not None else "0.97"
+    print("\nDrop threshold: articles with ad probability at or above this are")
+    print("skipped entirely. Event/promotional-sounding news can score ~0.91,")
+    print("so keep this high - a false drop loses a real article, a missed")
+    print("drop only costs one unnecessary summary.")
+    drop_raw = get_input(
+        "Drop threshold (0.5-1.0, higher = more conservative)",
+        default=current_drop_str,
+    ).strip()
+    try:
+        drop_threshold = float(drop_raw)
+        if not (0.5 <= drop_threshold <= 1.0):
+            raise ValueError
+        result = {"model": selected, "base_url": decision_url,
+                  "drop_threshold": drop_threshold}
+        print(f"Drop threshold: {drop_threshold:.2f}")
+        return result
+    except ValueError:
+        print(f"Invalid threshold '{drop_raw}' - keeping the current/default value.")
+        return {"model": selected, "base_url": decision_url, "drop_threshold": None}
 
 
 def _run_decision_model_option(config):
@@ -1410,9 +1435,13 @@ def _run_decision_model_option(config):
     config["decision_model"] = selection
     # Empty base_url = same server as the main provider
     config["decision_base_url"] = result.get("base_url", "")
+    if result.get("drop_threshold") is not None:
+        config["decision_ad_drop_threshold"] = result["drop_threshold"]
     save_config(config)
     where = result.get("base_url") or "the main server"
+    threshold = config.get("decision_ad_drop_threshold", "default")
     print(f"Decision model set to '{selection}' @ {where} - two-stage verdicts enabled!")
+    print(f"Drop threshold: {threshold}")
 
 
 def interactive_menu(config: Dict):
@@ -1707,6 +1736,7 @@ def first_run_setup() -> Optional[Dict]:
     config["request_timeout"] = 30  # Seconds; AI generation uses 3x this value
     config["decision_model"] = ""  # Disabled: verdicts from the main model's JSON
     config["decision_base_url"] = ""  # Empty: decider runs on the main server
+    config["decision_ad_drop_threshold"] = 0.97  # Conservative: false drops hide real articles
 
     # Save configuration
     if save_config(config):

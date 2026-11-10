@@ -187,7 +187,11 @@ class NewsSummarizer:
                     logger.info(f"Decision p(ad)={ad_p:.3f}, "
                                 f"p(clickbait)={item['probe'].get('clickbait_probability', 0):.3f} "
                                 f"for {item['feed_name']}: {item['cleaned_title'][:50]}...")
-                    if ad_p >= DECISION_AD_DROP_THRESHOLD:
+                    drop_threshold = getattr(
+                        self.text_client, 'decision_drop_threshold',
+                        DECISION_AD_DROP_THRESHOLD,
+                    )
+                    if ad_p >= drop_threshold:
                         logger.info(f"Pre-filter: pure ad, skipping summarization "
                                     f"for {item['feed_name']}: {item['cleaned_title'][:50]}...")
                         item['dropped'] = True
@@ -223,6 +227,10 @@ class NewsSummarizer:
             'ad_probability': probe.get('ad_probability'),
             'clickbait_probability': probe.get('clickbait_probability'),
             'decision_model': getattr(self.text_client, 'decision_model', None),
+            'drop_threshold': getattr(
+                self.text_client, 'decision_drop_threshold',
+                DECISION_AD_DROP_THRESHOLD,
+            ),
             'word_count': item['validation']['word_count'],
             'source': item['article_data'].get('source', 'extracted'),
             'language': item.get('language') or 'English',

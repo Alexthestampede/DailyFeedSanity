@@ -27,6 +27,7 @@ from ..config import (
     AD_DETECTION_TEMPERATURE,
     DECISION_VERDICT_THRESHOLD,
     DECISION_AMBIGUOUS_LOW,
+    DECISION_AD_DROP_THRESHOLD,
 )
 
 logger = get_logger(__name__)
@@ -43,7 +44,7 @@ class DomainTextProcessor:
 
     def __init__(self, text_processor, enable_ad_detection=True,
                  decision_client=None, decision_model=None,
-                 decision_threshold=None):
+                 decision_threshold=None, decision_drop_threshold=None):
         """
         Initialize domain text processor.
 
@@ -57,6 +58,9 @@ class DomainTextProcessor:
             decision_model: Decision model name (e.g. 'd1k32:latest', 'clef-flash')
             decision_threshold: Probability of 'true' above which a verdict
                 is positive (default from config)
+            decision_drop_threshold: Probability of 'ad' at or above which an
+                article is dropped before summarization (default from config;
+                conservative - false drops are worse than missed drops)
         """
         self.processor = text_processor
         self.current_date = datetime.now().strftime("%Y-%m-%d")
@@ -66,6 +70,10 @@ class DomainTextProcessor:
         self.decision_threshold = (
             decision_threshold if decision_threshold is not None
             else DECISION_VERDICT_THRESHOLD
+        )
+        self.decision_drop_threshold = (
+            decision_drop_threshold if decision_drop_threshold is not None
+            else DECISION_AD_DROP_THRESHOLD
         )
 
     def generate(self, prompt, system_prompt=None, temperature=0.7, max_tokens=None):

@@ -400,7 +400,7 @@ class HTMLGenerator:
                 decision_model=self._escape_html(article.get('decision_model') or 'decision model'),
                 ad_probability=f"{ad_p:.3f}" if ad_p is not None else "n/a",
                 clickbait_probability=f"{cb_p:.3f}" if cb_p is not None else "n/a",
-                threshold=f"{DECISION_AD_DROP_THRESHOLD:.2f}",
+                threshold=f"{article.get('drop_threshold', DECISION_AD_DROP_THRESHOLD):.2f}",
             ))
 
         items_html = '\n'.join(items)
