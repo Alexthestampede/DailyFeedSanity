@@ -186,11 +186,25 @@ def create_ai_client() -> Tuple[
     # Decision-model stage (optional): when configured, verdicts come from
     # a /v1/systemone request instead of the generative model's JSON.
     decision_model = user_config.get("decision_model") if user_config else None
+    decision_base_url = user_config.get("decision_base_url") if user_config else None
     decision_client = None
     if decision_model:
-        if hasattr(client, "system_one"):
+        if decision_base_url:
+            # Dedicated decider client: probes can run on a fast server while
+            # the generative model stays wherever the main provider points.
+            # Keeps the (tiny, latency-bound) decider off the LLM's hardware.
+            from lib.modulle.providers.ollama.client import OllamaClient
+
+            decision_client = OllamaClient(
+                base_url=decision_base_url,
+                request_timeout=request_timeout,
+            )
+            logger.info(
+                f"Decision stage enabled: {decision_model} @ {decision_base_url}"
+            )
+        elif hasattr(client, "system_one"):
             decision_client = client
-            logger.info(f"Decision stage enabled: {decision_model}")
+            logger.info(f"Decision stage enabled: {decision_model} @ {resolved.get('base_url')}")
         else:
             logger.warning(
                 f"decision_model '{decision_model}' set but provider client "
@@ -250,6 +264,9 @@ def create_ai_client_with_fallback() -> Tuple[
                 )
 
                 decision_model = user_config.get("decision_model") if user_config else None
+                decision_base_url = (
+                    user_config.get("decision_base_url") if user_config else None
+                )
 
                 client, text_proc, vision_proc = modulle_create(
                     provider="ollama",
@@ -259,12 +276,23 @@ def create_ai_client_with_fallback() -> Tuple[
                     request_timeout=request_timeout,
                 )
 
+                fallback_decision_client = None
+                if decision_model:
+                    if decision_base_url:
+                        from lib.modulle.providers.ollama.client import OllamaClient
+                        fallback_decision_client = OllamaClient(
+                            base_url=decision_base_url,
+                            request_timeout=request_timeout,
+                        )
+                    else:
+                        fallback_decision_client = client
+
                 domain_text = DomainTextProcessor(
                     text_proc,
                     enable_ad_detection=user_config.get("enable_ad_detection", True)
                     if user_config
                     else True,
-                    decision_client=client if decision_model else None,
+                    decision_client=fallback_decision_client,
                     decision_model=decision_model,
                 )
                 domain_vision = (

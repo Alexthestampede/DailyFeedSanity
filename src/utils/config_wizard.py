@@ -1069,7 +1069,12 @@ def display_config_summary(config: Dict):
     print(f"Request Timeout: {config.get('request_timeout', 30)}s "
           f"(AI generation: {config.get('request_timeout', 30) * 3}s)")
     decision_model = config.get("decision_model") or ""
-    print(f"Decision Model: {decision_model if decision_model else '(disabled)'}")
+    decision_url = config.get("decision_base_url") or ""
+    if decision_model:
+        print(f"Decision Model: {decision_model}"
+              + (f" @ {decision_url}" if decision_url else " @ main server"))
+    else:
+        print("Decision Model: (disabled)")
 
     feed_count = len(config.get("rss_feeds", []))
     print(f"RSS Feeds: {feed_count} configured")
@@ -1264,39 +1269,55 @@ def select_decision_model(config):
     """
     Interactive decision-model selection for the two-stage pre-filter.
 
-    Lists models from the Ollama server (numbered picker, consistent with
-    the text/vision model selectors) so the user cannot typo a name, then
-    validates the choice with a live /v1/systemone probe.
+    Asks which Ollama server should run the decider (default: the main
+    server), lists that server's models (numbered picker, consistent with the
+    text/vision selectors) so the user cannot typo, then validates the choice
+    with a live /v1/systemone probe.
 
-    Non-ollama providers keep manual entry: only OllamaClient exposes
-    system_one.
+    A separate decision server lets the (tiny, latency-bound) decider run on
+    a fast machine while the generative model stays wherever it is.
 
     Args:
         config: Configuration dictionary
 
     Returns:
-        Selected model name, "off" to disable, or None on failure
+        dict with 'model' and 'base_url' (empty base_url = same as main),
+        {'model': 'off'} to disable, or None on failure
     """
     current = config.get("decision_model") or ""
+    current_url = config.get("decision_base_url") or ""
     print(f"\nCurrent decision model: {current or '(disabled)'}")
-    print("\nA decision model (nimble, clef, clef-flash, d1k32, ...) produces")
+    if current_url:
+        print(f"Current decision server: {current_url}")
+    print("\nA decision model (nimble, clef, clef-flash, d1k32, d1, ...) produces")
     print("clickbait/ad verdicts as direct probabilities via Ollama's")
     print("/v1/systemone endpoint (Ollama >= 0.35.1), instead of asking the")
     print("main generative model for verdicts in its JSON.")
 
     provider = config.get("ai_provider", "ollama")
-    ollama_based = provider in ("ollama", "ollama_cloud", "ollamacloud")
+    main_server = config.get("ollama_base_url") or "http://localhost:11434"
+
+    # Which server runs the decider? (A fast box keeps the slow one free.)
+    print(f"\nThe decider is tiny but answers one request per article; on a slow")
+    print(f"machine that adds up. You can run it on a different Ollama server.")
+    decision_url = get_input(
+        "Decision server URL (blank = same as main server)",
+        default=current_url or "",
+    ).strip()
+
+    # Normalize: blank means "use the main server"
+    if decision_url and not decision_url.startswith(("http://", "https://")):
+        decision_url = f"http://{decision_url}"
+    probe_server = decision_url or main_server
 
     server = None
-    if provider == "ollama_cloud" or provider == "ollamacloud":
-        server = None  # ollama.com list endpoint needs auth; skip listing
-    elif ollama_based:
-        server = config.get("ollama_base_url")
+    if probe_server:
+        server = probe_server
 
     selected = None
 
     if server:
-        # Grab the list from the server - no typos possible
+        # Grab the list from the decision server - no typos possible
         inspector = OllamaInspector(server)
         models = inspector.list_models()
 
@@ -1359,33 +1380,39 @@ def select_decision_model(config):
             print("\nDecision stage disabled - verdicts come from the main model's JSON.")
         else:
             print("\nDecision stage stays disabled.")
-        return "off"
+        return {"model": "off"}
 
-    # Validate with a live probe (guards against picking a generative model)
-    probe_server = server or config.get("ollama_cloud_base_url") or "https://ollama.com"
+    # Validate with a live probe (guards against picking a generative model
+    # and confirms the decision server can actually run it)
     ok, error = _probe_decision_model(probe_server, selected)
     if ok:
-        print(f"\nProbe OK - '{selected}' answered a systemone request.")
-        return selected
+        print(f"\nProbe OK - '{selected}' @ {probe_server} answered a systemone request.")
+        return {"model": selected, "base_url": decision_url}
 
-    print(f"\nProbe failed: {error}")
+    print(f"\nProbe failed on {probe_server}: {error}")
     if get_yes_no("Save anyway?", default=False):
         print(f"Saved '{selected}' untested - it will fail gracefully at runtime if invalid.")
-        return selected
+        return {"model": selected, "base_url": decision_url}
     return None
 
 
 def _run_decision_model_option(config):
     """Handler for wizard option [16]; saves the selection."""
-    selection = select_decision_model(config)
-    if selection is None:
+    result = select_decision_model(config)
+    if result is None:
         return
-    config["decision_model"] = "" if selection == "off" else selection
-    save_config(config)
+    selection = result["model"]
     if selection == "off":
+        config["decision_model"] = ""
+        save_config(config)
         print("Decision stage disabled.")
-    else:
-        print(f"Decision model set to '{selection}' - two-stage verdicts enabled!")
+        return
+    config["decision_model"] = selection
+    # Empty base_url = same server as the main provider
+    config["decision_base_url"] = result.get("base_url", "")
+    save_config(config)
+    where = result.get("base_url") or "the main server"
+    print(f"Decision model set to '{selection}' @ {where} - two-stage verdicts enabled!")
 
 
 def interactive_menu(config: Dict):
@@ -1679,6 +1706,7 @@ def first_run_setup() -> Optional[Dict]:
     config["enable_ad_detection"] = True  # Ad detection enabled by default
     config["request_timeout"] = 30  # Seconds; AI generation uses 3x this value
     config["decision_model"] = ""  # Disabled: verdicts from the main model's JSON
+    config["decision_base_url"] = ""  # Empty: decider runs on the main server
 
     # Save configuration
     if save_config(config):
